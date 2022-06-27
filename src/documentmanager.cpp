@@ -273,7 +273,7 @@ DocumentManager::DocumentManager
 
 DocumentManager::~DocumentManager()
 {
-    Q_D(DocumentManager);
+    ;
 }
 
 MarkdownDocument *DocumentManager::document() const

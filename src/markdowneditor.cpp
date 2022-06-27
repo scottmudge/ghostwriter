@@ -1313,7 +1313,7 @@ void MarkdownEditor::unindentText()
     cursor.endEditBlock();
 }
 
-bool MarkdownEditor::toggleTaskComplete()
+void MarkdownEditor::toggleTaskComplete()
 {
     Q_D(MarkdownEditor);
     
@@ -1374,7 +1374,6 @@ bool MarkdownEditor::toggleTaskComplete()
     }
 
     cursor.endEditBlock();
-    return true;
 }
 
 void MarkdownEditor::setEnableLargeHeadingSizes(bool enable)

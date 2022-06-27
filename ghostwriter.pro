@@ -91,6 +91,7 @@ INCLUDEPATH += src src/spelling
 
 HEADERS += \
     src/abstractstatisticswidget.h \
+    src/actions.h \
     src/appsettings.h \
     src/asynctextwriter.h \
     src/cmarkgfmapi.h \
@@ -145,6 +146,7 @@ HEADERS += \
 
 SOURCES += \
     src/abstractstatisticswidget.cpp \
+    src/actions.cpp \
     src/appmain.cpp \
     src/appsettings.cpp \
     src/asynctextwriter.cpp \

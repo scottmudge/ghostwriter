@@ -20,9 +20,7 @@
 #ifndef MAIN_WINDOW_H
 #define MAIN_WINDOW_H
 
-#include <QAction>
 #include <QLabel>
-#include <QPushButton>
 #include <QSettings>
 #include <QSplitter>
 
@@ -110,34 +108,22 @@ private:
     Theme theme;
     QString language;
     Sidebar *sidebar;
-    QPushButton *sidebarToggleButton;
     StatisticsIndicator *statisticsIndicator;
     QLabel *statusIndicator;
     TimeLabel *timeIndicator;
-    QPushButton *toggleSidebarButton;
-    QPushButton *previewOptionsButton;
-    QPushButton *exportButton;
-    QPushButton *copyHtmlButton;
-    QPushButton *hemingwayModeButton;
-    QPushButton *focusModeButton;
-    QPushButton *htmlPreviewButton;
     HtmlPreview *htmlPreview;
-    QAction *htmlPreviewMenuAction;
-    QAction *fullScreenMenuAction;
-    QPushButton *fullScreenButton;
     OutlineWidget *outlineWidget;
     DocumentStatistics *documentStats;
     DocumentStatisticsWidget *documentStatsWidget;
     SessionStatistics *sessionStats;
     SessionStatisticsWidget *sessionStatsWidget;
     QListWidget *cheatSheetWidget;
-    QAction *recentFilesActions[MAX_RECENT_FILES];
+    QList<QAction*> recentFilesActions;
     bool menuBarMenuActivated;
     QAction *showSidebarAction;
     bool sidebarHiddenForResize;
     bool focusModeEnabled;
 
-    QList<QWidget *> statusBarButtons;
     QList<QWidget *> statusBarWidgets;
 
     AppSettings *appSettings;
@@ -160,6 +146,7 @@ private:
 
     void buildMenuBar();
     void buildStatusBar();
+    void registerActionHandlers();
     void buildSidebar();
 
     void adjustEditor();

@@ -38,10 +38,11 @@
 #include <QSettings>
 #include <QSizePolicy>
 #include <QStatusBar>
-#include <QTemporaryFile>
+#include <QToolButton>
 
 #include "3rdparty/QtAwesome/QtAwesome.h"
 
+#include "actions.h"
 #include "documenthistory.h"
 #include "exporter.h"
 #include "exporterfactory.h"
@@ -173,38 +174,30 @@ MainWindow::MainWindow(const QString &filePath, QWidget *parent)
         }
     }
 
-    for (int i = 0; i < MAX_RECENT_FILES; i++) {
-        recentFilesActions[i] = new QAction(this);
+    recentFilesActions.append(appActions->action(Actions::OpenRecent0));
+    recentFilesActions.append(appActions->action(Actions::OpenRecent1));
+    recentFilesActions.append(appActions->action(Actions::OpenRecent2));
+    recentFilesActions.append(appActions->action(Actions::OpenRecent3));
+    recentFilesActions.append(appActions->action(Actions::OpenRecent4));
+    recentFilesActions.append(appActions->action(Actions::OpenRecent5));
+    recentFilesActions.append(appActions->action(Actions::OpenRecent6));
+    recentFilesActions.append(appActions->action(Actions::OpenRecent7));
+    recentFilesActions.append(appActions->action(Actions::OpenRecent8));
+    recentFilesActions.append(appActions->action(Actions::OpenRecent9));
 
-        this->connect
-        (
-            recentFilesActions[i],
-            &QAction::triggered,
-            [this, i]() {
-
-                if (nullptr != recentFilesActions[i]) {
-                    // Use the action's data for access to the actual file path, since
-                    // KDE Plasma will add a keyboard accelerator to the action's text
-                    // by inserting an ampersand (&) into it.
-                    //
-                    documentManager->open(recentFilesActions[i]->data().toString());
-                    refreshRecentFiles();
-                }
-            }
-        );
-
+    for (int i = 0; i < recentFilesActions.size(); i++) {
         if (i < recentFiles.size()) {
-            recentFilesActions[i]->setText(recentFiles.at(i));
+            recentFilesActions.at(i)->setText(recentFiles.at(i));
 
             // Use the action's data for access to the actual file path, since
             // KDE Plasma will add a keyboard accelerator to the action's text
             // by inserting an ampersand (&) into it.
             //
-            recentFilesActions[i]->setData(recentFiles.at(i));
+            recentFilesActions.at(i)->setData(recentFiles.at(i));
 
-            recentFilesActions[i]->setVisible(true);
+            recentFilesActions.at(i)->setVisible(true);
         } else {
-            recentFilesActions[i]->setVisible(false);
+            recentFilesActions.at(i)->setVisible(false);
         }
     }
 
@@ -299,6 +292,7 @@ MainWindow::MainWindow(const QString &filePath, QWidget *parent)
     statusBarWidgets.append(this->findReplace);
     this->findReplace->setVisible(false);
 
+    registerActionHandlers();
     buildMenuBar();
     buildStatusBar();
 
@@ -519,13 +513,9 @@ void MainWindow::openPreferencesDialog()
 
 void MainWindow::toggleHtmlPreview(bool checked)
 {
-    htmlPreviewMenuAction->blockSignals(true);
-
-    htmlPreviewMenuAction->setChecked(checked);
     htmlPreview->setVisible(checked);
     htmlPreview->updatePreview();
 
-    htmlPreviewMenuAction->blockSignals(false);
     appSettings->setHtmlPreviewVisible(checked);
     this->update();
     adjustEditor();
@@ -561,14 +551,6 @@ void MainWindow::toggleFocusMode(bool checked)
 void MainWindow::toggleFullScreen(bool checked)
 {
     static bool lastStateWasMaximized = false;
-
-    this->fullScreenMenuAction->blockSignals(true);
-    this->fullScreenMenuAction->setChecked(checked);
-    this->fullScreenMenuAction->blockSignals(false);
-
-    this->fullScreenButton->blockSignals(true);
-    this->fullScreenButton->setChecked(checked);
-    this->fullScreenButton->blockSignals(false);
 
     if (this->isFullScreen() || !checked) {
         if (appSettings->displayTimeInFullScreenEnabled()) {
@@ -759,14 +741,24 @@ void MainWindow::refreshRecentFiles()
             recentFiles.removeAll(sanitizedPath);
         }
 
-        for (int i = 0; (i < MAX_RECENT_FILES) && (i < recentFiles.size()); i++) {
-            recentFilesActions[i]->setText(recentFiles.at(i));
-            recentFilesActions[i]->setData(recentFiles.at(i));
-            recentFilesActions[i]->setVisible(true);
+        for (int i = 0;
+                (i < recentFilesActions.size()) && (i < recentFiles.size());
+                i++) {
+            QAction *action = recentFilesActions.at(i);
+
+            if (nullptr != action) {
+                action->setText(recentFiles.at(i));
+                action->setData(recentFiles.at(i));
+                action->setVisible(true);
+            }
         }
 
-        for (int i = recentFiles.size(); i < MAX_RECENT_FILES; i++) {
-            recentFilesActions[i]->setVisible(false);
+        for (int i = recentFiles.size(); i < recentFilesActions.size(); i++) {
+            QAction *action = recentFilesActions.at(i);
+
+            if (nullptr != action) {
+                action->setVisible(false);
+            }
         }
     }
 }
@@ -776,8 +768,10 @@ void MainWindow::clearRecentFileHistory()
     DocumentHistory history;
     history.clear();
 
-    for (int i = 0; i < MAX_RECENT_FILES; i++) {
-        recentFilesActions[i]->setVisible(false);
+    for (QAction *action : recentFilesActions) {
+        if (nullptr != action) {
+            action->setVisible(false);
+        }
     }
 }
 
@@ -916,19 +910,9 @@ void MainWindow::onAboutToShowMenuBarMenu()
 
 void MainWindow::onSidebarVisibilityChanged(bool visible)
 {
-    if (visible) {
-        toggleSidebarButton->setText(QChar(fa::chevronleft));
-    } else {
-        toggleSidebarButton->setText(QChar(fa::chevronright));
-    }
-
     if (!visible) {
         editor->setFocus();
     }
-
-    this->showSidebarAction->blockSignals(true);
-    this->showSidebarAction->setChecked(visible);
-    this->showSidebarAction->blockSignals(false);
 
     this->adjustEditor();
 }
@@ -989,158 +973,112 @@ QAction* MainWindow::createWidgetAction
 
 void MainWindow::buildMenuBar()
 {
-
     QMenu *fileMenu = this->menuBar()->addMenu(tr("&File"));
 
-    fileMenu->addAction(createWindowAction(tr("&New"), documentManager, SLOT(close()), QKeySequence::New));
-    fileMenu->addAction(createWindowAction(tr("&Open"), documentManager, SLOT(open()), QKeySequence::Open));
+    fileMenu->addAction(appActions->registerHandler(Actions::NewFile,
+        [this]() {
+            documentManager->close();
+        }
+    ));
+    fileMenu->addAction(appActions->registerHandler(Actions::OpenFile,
+        [this]() {
+            documentManager->open();
+        }
+    ));
 
     QMenu *recentFilesMenu = new QMenu(tr("Open &Recent..."));
-    recentFilesMenu->addAction(createWindowAction(tr("Reopen Closed File"), documentManager, SLOT(reopenLastClosedFile()), QKeySequence("SHIFT+CTRL+T")));
+    recentFilesMenu->addAction(appActions->action(Actions::ReopenLast));
     recentFilesMenu->addSeparator();
 
-    for (int i = 0; i < MAX_RECENT_FILES; i++) {
-        recentFilesMenu->addAction(recentFilesActions[i]);
+    for (QAction *action : recentFilesActions) {
+        recentFilesMenu->addAction(action);
     }
 
     recentFilesMenu->addSeparator();
-    recentFilesMenu->addAction(createWindowAction(tr("Clear Menu"), this, SLOT(clearRecentFileHistory())));
+    recentFilesMenu->addAction(appActions->action(Actions::ClearHistory));
 
     fileMenu->addMenu(recentFilesMenu);
 
     fileMenu->addSeparator();
-    fileMenu->addAction(createWindowAction(tr("&Save"), documentManager, SLOT(save()), QKeySequence::Save));
-    fileMenu->addAction(createWindowAction(tr("Save &As..."), documentManager, SLOT(saveAs()), QKeySequence::SaveAs));
-    fileMenu->addAction(createWindowAction(tr("R&ename..."), documentManager, SLOT(rename())));
-    fileMenu->addAction(createWindowAction(tr("Re&load from Disk..."), documentManager, SLOT(reload())));
+    fileMenu->addAction(appActions->action(Actions::Save));
+    fileMenu->addAction(appActions->action(Actions::SaveAs));
+    fileMenu->addAction(appActions->action(Actions::RenameFile));
+    fileMenu->addAction(appActions->action(Actions::ReloadFile));
     fileMenu->addSeparator();
-    fileMenu->addAction(createWindowAction(tr("&Export"), documentManager, SLOT(exportFile()), QKeySequence("CTRL+E")));
+    fileMenu->addAction(appActions->action(Actions::ExportFile));
     fileMenu->addSeparator();
-    QAction *quitAction = createWindowAction(tr("&Quit"), this, SLOT(quitApplication()), QKeySequence::Quit);
-    quitAction->setMenuRole(QAction::QuitRole);
-    fileMenu->addAction(quitAction);
+    fileMenu->addAction(appActions->action(Actions::Quit));
 
     QMenu *editMenu = this->menuBar()->addMenu(tr("&Edit"));
-    editMenu->addAction(createWidgetAction(tr("&Undo"), editor, SLOT(undo()), QKeySequence::Undo));
-    editMenu->addAction(createWidgetAction(tr("&Redo"), editor, SLOT(redo()), QKeySequence::Redo));
+    editMenu->addAction(appActions->action(Actions::Undo));
+    editMenu->addAction(appActions->action(Actions::Redo));
     editMenu->addSeparator();
-    editMenu->addAction(createWidgetAction(tr("Cu&t"), editor, SLOT(cut()), QKeySequence::Cut));
-    editMenu->addAction(createWidgetAction(tr("&Copy"), editor, SLOT(copy()), QKeySequence::Copy));
-    editMenu->addAction(createWidgetAction(tr("&Paste"), editor, SLOT(paste()), QKeySequence::Paste));
-    editMenu->addAction(createWidgetAction(tr("Copy &HTML"), this, SLOT(copyHtml()), QKeySequence("SHIFT+CTRL+C")));
+    editMenu->addAction(appActions->action(Actions::Cut));
+    editMenu->addAction(appActions->action(Actions::Copy));
+    editMenu->addAction(appActions->action(Actions::Paste));
+    editMenu->addAction(appActions->action(Actions::CopyHtml));
     editMenu->addSeparator();
-    editMenu->addAction(createWidgetAction(tr("&Insert Image..."), this, SLOT(insertImage())));
+    editMenu->addAction(appActions->action(Actions::InsertImage));
     editMenu->addSeparator();
 
-    editMenu->addAction(createWindowAction(tr("&Find"), findReplace, SLOT(showFindView()), QKeySequence::Find));
-    editMenu->addAction(createWindowAction(tr("Rep&lace"), findReplace, SLOT(showReplaceView()), QKeySequence::Replace));
-    editMenu->addAction(createWindowAction(tr("Find &Next"), findReplace, SLOT(findNext()), QKeySequence::FindNext));
-    editMenu->addAction(createWindowAction(tr("Find &Previous"), findReplace, SLOT(findPrevious()), QKeySequence::FindPrevious));
+    editMenu->addAction(appActions->action(Actions::Find));
+    editMenu->addAction(appActions->action(Actions::Replace));
+    editMenu->addAction(appActions->action(Actions::FindNext));
+    editMenu->addAction(appActions->action(Actions::FindPrevious));
     editMenu->addSeparator();
-    editMenu->addAction(createWindowAction(tr("&Spell check"), editor, SLOT(runSpellChecker())));
+    editMenu->addAction(appActions->action(Actions::SpellCheck));
 
     QMenu *formatMenu = this->menuBar()->addMenu(tr("For&mat"));
-    formatMenu->addAction(createWidgetAction(tr("&Bold"), editor, SLOT(bold()), QKeySequence::Bold));
-    formatMenu->addAction(createWidgetAction(tr("&Italic"), editor, SLOT(italic()), QKeySequence::Italic));
-    formatMenu->addAction(createWidgetAction(tr("Stri&kethrough"), editor, SLOT(strikethrough()), QKeySequence("Ctrl+K")));
-    formatMenu->addAction(createWidgetAction(tr("&HTML Comment"), editor, SLOT(insertComment()), QKeySequence("Ctrl+/")));
+    formatMenu->addAction(appActions->action(Actions::Bold));
+    formatMenu->addAction(appActions->action(Actions::Italic));
+    formatMenu->addAction(appActions->action(Actions::Strikethrough));
+    formatMenu->addAction(appActions->action(Actions::HtmlComment));
     formatMenu->addSeparator();
 
-    formatMenu->addAction(createWidgetAction(tr("I&ndent"), editor, SLOT(indentText()), QKeySequence("Tab")));
-    formatMenu->addAction(createWidgetAction(tr("&Unindent"), editor, SLOT(unindentText()), QKeySequence("Shift+Tab")));
+    formatMenu->addAction(appActions->action(Actions::Indent));
+    formatMenu->addAction(appActions->action(Actions::Unindent));
     formatMenu->addSeparator();
-    formatMenu->addAction(createWidgetAction(tr("Block &Quote"), editor, SLOT(createBlockquote()), QKeySequence("Ctrl+.")));
-    formatMenu->addAction(createWidgetAction(tr("&Strip Block Quote"), editor, SLOT(removeBlockquote()), QKeySequence("Ctrl+,")));
+    formatMenu->addAction(appActions->action(Actions::BlockQuote));
+    formatMenu->addAction(appActions->action(Actions::StripBlockQuote));
     formatMenu->addSeparator();
-    formatMenu->addAction(createWidgetAction(tr("&* Bullet List"), editor, SLOT(createBulletListWithAsteriskMarker()), QKeySequence("Ctrl+8")));
-    formatMenu->addAction(createWidgetAction(tr("&- Bullet List"), editor, SLOT(createBulletListWithMinusMarker()), QKeySequence("Ctrl+Shift+-")));
-    formatMenu->addAction(createWidgetAction(tr("&+ Bullet List"), editor, SLOT(createBulletListWithPlusMarker()), QKeySequence("Ctrl+Shift+=")));
+    formatMenu->addAction(appActions->action(Actions::BulletListAsterisk));
+    formatMenu->addAction(appActions->action(Actions::BulletListMinus));
+    formatMenu->addAction(appActions->action(Actions::BulletListPlus));
     formatMenu->addSeparator();
-    formatMenu->addAction(createWidgetAction(tr("1&. Numbered List"), editor, SLOT(createNumberedListWithPeriodMarker()), QKeySequence("Ctrl+1")));
-    formatMenu->addAction(createWidgetAction(tr("1&) Numbered List"), editor, SLOT(createNumberedListWithParenthesisMarker()), QKeySequence("Ctrl+0")));
+    formatMenu->addAction(appActions->action(Actions::NumberedListPeriod));
+    formatMenu->addAction(appActions->action(Actions::NumberedListParenthesis));
     formatMenu->addSeparator();
-    formatMenu->addAction(createWidgetAction(tr("&Task List"), editor, SLOT(createTaskList()), QKeySequence("Ctrl+T")));
-    formatMenu->addAction(createWidgetAction(tr("Toggle Task(s) &Complete"), editor, SLOT(toggleTaskComplete()), QKeySequence("Ctrl+D")));
-
+    formatMenu->addAction(appActions->action(Actions::TaskList));
+    formatMenu->addAction(appActions->action(Actions::ToggleTaskComplete));
 
     QMenu *viewMenu = this->menuBar()->addMenu(tr("&View"));
-
-    fullScreenMenuAction = new QAction(tr("&Full Screen"), this);
-    fullScreenMenuAction->setCheckable(true);
-    fullScreenMenuAction->setChecked(this->isFullScreen());
-    fullScreenMenuAction->setShortcut(QKeySequence("F11"));
-    fullScreenMenuAction->setShortcutContext(Qt::WindowShortcut);
-    connect(fullScreenMenuAction, SIGNAL(toggled(bool)), this, SLOT(toggleFullScreen(bool)));
-    viewMenu->addAction(fullScreenMenuAction);
-    
-    htmlPreviewMenuAction = createWindowAction(tr("&Preview in HTML"), this, SLOT(toggleHtmlPreview(bool)), QKeySequence("CTRL+P"));
-    htmlPreviewMenuAction->setCheckable(true);
-    htmlPreviewMenuAction->setChecked(appSettings->htmlPreviewVisible());
-    viewMenu->addAction(htmlPreviewMenuAction);
-
-    this->addAction(showSidebarAction);
-    viewMenu->addAction(showSidebarAction);
-
-    QAction *showSidebarTabAction = viewMenu->addAction(tr("&Outline"),
-        this,
-        [this]() {
-            sidebar->setVisible(true);
-            sidebar->setCurrentTabIndex(OutlineSidebarTab);
-        },
-        QKeySequence("CTRL+J"));
-    showSidebarTabAction->setShortcutContext(Qt::WindowShortcut);
-    this->addAction(showSidebarTabAction);
-    
-    showSidebarTabAction = viewMenu->addAction(tr("&Session Statistics"),
-        this,
-        [this]() {
-            sidebar->setVisible(true);
-            sidebar->setCurrentTabIndex(SessionStatsSidebarTab);
-        });
-    showSidebarTabAction->setShortcutContext(Qt::WindowShortcut);
-    this->addAction(showSidebarTabAction);
-
-    showSidebarTabAction = viewMenu->addAction(tr("&Document Statistics"),
-        this,
-        [this]() {
-            sidebar->setVisible(true);
-            sidebar->setCurrentTabIndex(DocumentStatsSidebarTab);
-        });
-    showSidebarTabAction->setShortcutContext(Qt::WindowShortcut);
-    this->addAction(showSidebarTabAction);
-
-    showSidebarTabAction = viewMenu->addAction(tr("&Cheat Sheet"),
-        this,
-        [this]() {
-            sidebar->setVisible(true);
-            sidebar->setCurrentTabIndex(CheatSheetSidebarTab);
-        },
-        QKeySequence::HelpContents);
-    showSidebarTabAction->setShortcutContext(Qt::WindowShortcut);
-    this->addAction(showSidebarTabAction);
+    viewMenu->addAction(appActions->action(Actions::ToggleFullScreen));
+    viewMenu->addAction(appActions->action(Actions::ToggleHtmlPreview));
+    viewMenu->addAction(appActions->action(Actions::ToggleSidebar));
+    viewMenu->addAction(appActions->action(Actions::ToggleDarkMode));
+    viewMenu->addAction(appActions->action(Actions::ToggleHemingwayMode));
+    viewMenu->addAction(appActions->action(Actions::ToggleDistractionFreeMode));
+    viewMenu->addAction(appActions->action(Actions::ShowOutline));
+    viewMenu->addAction(appActions->action(Actions::ShowSessionStatistics));
+    viewMenu->addAction(appActions->action(Actions::ShowDocumentStatistics));
+    viewMenu->addAction(appActions->action(Actions::ShowCheatSheet));
     
     viewMenu->addSeparator();
-    viewMenu->addAction(createWidgetAction(tr("Increase Font Size"), editor, SLOT(increaseFontSize()), QKeySequence("CTRL+=")));
-    viewMenu->addAction(createWidgetAction(tr("Decrease Font Size"), editor, SLOT(decreaseFontSize()), QKeySequence("CTRL+-")));
+    viewMenu->addAction(appActions->action(Actions::ZoomIn));
+    viewMenu->addAction(appActions->action(Actions::ZoomOut));
 
     QMenu *settingsMenu = this->menuBar()->addMenu(tr("&Settings"));
-    settingsMenu->addAction(createWindowAction(tr("Themes..."), this, SLOT(changeTheme())));
-    settingsMenu->addAction(createWindowAction(tr("Font..."), this, SLOT(changeFont())));
-    settingsMenu->addAction(createWindowAction(tr("Application Language..."), this, SLOT(onSetLocale())));
-    settingsMenu->addAction(createWindowAction(tr("Preview Options..."), this, SLOT(showPreviewOptions())));
-    QAction *preferencesAction = createWindowAction(tr("Preferences..."), this, SLOT(openPreferencesDialog()));
-    preferencesAction->setMenuRole(QAction::PreferencesRole);
-    settingsMenu->addAction(preferencesAction);
+    settingsMenu->addAction(appActions->action(Actions::ShowThemes));
+    settingsMenu->addAction(appActions->action(Actions::ShowFonts));
+    settingsMenu->addAction(appActions->action(Actions::ShowAppLanguages));
+    settingsMenu->addAction(appActions->action(Actions::ShowPreviewOptions));
+    settingsMenu->addAction(appActions->action(Actions::ShowPreferences));
 
     QMenu *helpMenu = this->menuBar()->addMenu(tr("&Help"));
-    QAction *helpAction = createWindowAction(tr("&About"), this, SLOT(showAbout()));
-    helpAction->setMenuRole(QAction::AboutRole);
-    helpMenu->addAction(helpAction);
-    helpAction = createWindowAction(tr("About &Qt"), qApp, SLOT(aboutQt()));
-    helpAction->setMenuRole(QAction::AboutQtRole);
-    helpMenu->addAction(helpAction);
-    helpMenu->addAction(createWindowAction(tr("Quick &Reference Guide"), this, SLOT(showQuickReferenceGuide())));
-    helpMenu->addAction(createWindowAction(tr("Wiki"), this, SLOT(showWikiPage())));
+    helpMenu->addAction(appActions->action(Actions::About));
+    helpMenu->addAction(appActions->action(Actions::AboutQt));
+    helpMenu->addAction(appActions->action(Actions::Documentation));
+    helpMenu->addAction(appActions->action(Actions::Wiki));
 
     connect(fileMenu, SIGNAL(aboutToShow()), this, SLOT(onAboutToShowMenuBarMenu()));
     connect(fileMenu, SIGNAL(aboutToHide()), this, SLOT(onAboutToHideMenuBarMenu()));
@@ -1188,25 +1126,28 @@ void MainWindow::buildStatusBar()
     // Add left-most widgets to status bar.
     QFont buttonFont(this->awesome->font(style::stfas, 16));
 
-    toggleSidebarButton = new QPushButton(QChar(fa::chevronright));
-    toggleSidebarButton->setObjectName("showSidebarButton");
-    toggleSidebarButton->setFont(buttonFont);
-    toggleSidebarButton->setFocusPolicy(Qt::NoFocus);
-    toggleSidebarButton->setToolTip(tr("Toggle sidebar"));
-    toggleSidebarButton->setCheckable(false);
-    toggleSidebarButton->setChecked(false);
+    QToolButton *button = new QToolButton(this);
+    button->setDefaultAction(appActions->action(Actions::ToggleSidebar));
+    button->setText(QChar(fa::chevronright));
+    button->setObjectName("showSidebarButton");
+    button->setFont(buttonFont);
+    button->setFocusPolicy(Qt::NoFocus);
 
-    leftLayout->addWidget(toggleSidebarButton, 0, Qt::AlignLeft);
-    statusBarWidgets.append(toggleSidebarButton);
+    leftLayout->addWidget(button, 0, Qt::AlignLeft);
+    statusBarWidgets.append(button);
 
     if (appSettings->sidebarVisible()) {
-        toggleSidebarButton->setText(QChar(fa::chevronleft));
+        button->setText(QChar(fa::chevronleft));
     }
 
-    this->connect(toggleSidebarButton,
-        &QPushButton::clicked,
-        [this]() {
-            toggleSidebarVisible(!sidebar->isVisible());
+    // Change the icon whenever the sidebar button's action is toggled.
+    appActions->registerHandler(Actions::ToggleSidebar,
+        [button](bool checked) {
+            if (checked) {
+                button->setText(QChar(fa::chevronleft));
+            } else {
+                button->setText(QChar(fa::chevronright));
+            }
         }
     );
     
@@ -1247,76 +1188,78 @@ void MainWindow::buildStatusBar()
     statusBarWidgets.append(statisticsIndicator);
 
     // Add right-most widgets to status bar.
-    QPushButton *button = new QPushButton(QChar(fa::moon));
+    button = new QToolButton();
+    button->setDefaultAction(appActions->action(Actions::ToggleDarkMode));
+    button->setText(QChar(fa::moon));
     button->setFont(buttonFont);
     button->setFocusPolicy(Qt::NoFocus);
-    button->setToolTip(tr("Toggle dark mode"));
-    button->setCheckable(true);
-    button->setChecked(appSettings->darkModeEnabled());
-
-    this->connect
-    (
-        button,
-        &QPushButton::toggled,
-        [this](bool enabled) {
-            appSettings->setDarkModeEnabled(enabled);
-            applyTheme();
-        }
-    );
-
-    rightLayout->addWidget(button, 0, Qt::AlignRight);
-    statusBarWidgets.append(button);
-
-    button = new QPushButton(QChar(fa::code));
-    button->setFont(buttonFont);
-    button->setFocusPolicy(Qt::NoFocus);
-    button->setToolTip(tr("Toggle Live HTML Preview"));
-    button->setCheckable(true);
-    button->setChecked(appSettings->htmlPreviewVisible());
-    connect(button, SIGNAL(toggled(bool)), this, SLOT(toggleHtmlPreview(bool)));
-    rightLayout->addWidget(button, 0, Qt::AlignRight);
-    statusBarWidgets.append(button);
-
-    this->connect
-    (
-        this->htmlPreviewMenuAction,
-        &QAction::toggled,
+    appActions->registerHandler(Actions::ToggleDarkMode,
         [button](bool checked) {
-            button->blockSignals(true);
-            button->setChecked(checked);
-            button->blockSignals(false);
+            Q_UNUSED(checked)
+            button->setText(QChar(fa::moon));
         }
     );
 
-    button = new QPushButton(QChar(fa::backspace));
-    button->setFont(buttonFont);
-    button->setFocusPolicy(Qt::NoFocus);
-    button->setToolTip(tr("Toggle Hemingway mode"));
-    button->setCheckable(true);
-    connect(button, SIGNAL(toggled(bool)), this, SLOT(toggleHemingwayMode(bool)));
     rightLayout->addWidget(button, 0, Qt::AlignRight);
     statusBarWidgets.append(button);
 
-    button = new QPushButton(QChar(fa::headphonesalt));
+    button = new QToolButton();
+    button->setDefaultAction(appActions->action(Actions::ToggleHtmlPreview));
+    button->setText(QChar(fa::code));
     button->setFont(buttonFont);
     button->setFocusPolicy(Qt::NoFocus);
-    button->setToolTip(tr("Toggle distraction free mode"));
-    button->setCheckable(true);
-    connect(button, SIGNAL(toggled(bool)), this, SLOT(toggleFocusMode(bool)));
+    appActions->registerHandler(Actions::ToggleHtmlPreview,
+        [button](bool checked) {
+            Q_UNUSED(checked)
+            button->setText(QChar(fa::code));
+        }
+    );
+
     rightLayout->addWidget(button, 0, Qt::AlignRight);
     statusBarWidgets.append(button);
 
-    button = new QPushButton(QChar(fa::expand));
+    button = new QToolButton();
+    button->setDefaultAction(appActions->action(Actions::ToggleHemingwayMode));
+    button->setText(QChar(fa::backspace));
     button->setFont(buttonFont);
     button->setFocusPolicy(Qt::NoFocus);
-    button->setObjectName("fullscreenButton");
-    button->setToolTip(tr("Toggle full screen mode"));
-    button->setCheckable(true);
-    button->setChecked(this->isFullScreen());
-    connect(button, SIGNAL(toggled(bool)), this, SLOT(toggleFullScreen(bool)));
+    appActions->registerHandler(Actions::ToggleHemingwayMode,
+        [button](bool checked) {
+            Q_UNUSED(checked)
+            button->setText(QChar(fa::backspace));
+        }
+    );
+
     rightLayout->addWidget(button, 0, Qt::AlignRight);
     statusBarWidgets.append(button);
-    this->fullScreenButton = button;
+
+    button = new QToolButton();
+    button->setDefaultAction(appActions->action(Actions::ToggleDistractionFreeMode));
+    button->setText(QChar(fa::headphonesalt));
+    button->setFont(buttonFont);
+    button->setFocusPolicy(Qt::NoFocus);
+    rightLayout->addWidget(button, 0, Qt::AlignRight);
+    statusBarWidgets.append(button);
+    appActions->registerHandler(Actions::ToggleDistractionFreeMode,
+        [button](bool checked) {
+            Q_UNUSED(checked)
+            button->setText(QChar(fa::headphonesalt));
+        }
+    );
+
+    button = new QToolButton();
+    button->setDefaultAction(appActions->action(Actions::ToggleFullScreen));
+    button->setText(QChar(fa::expand));
+    button->setFont(buttonFont);
+    button->setFocusPolicy(Qt::NoFocus);
+    rightLayout->addWidget(button, 0, Qt::AlignRight);
+    statusBarWidgets.append(button);
+    appActions->registerHandler(Actions::ToggleFullScreen,
+        [button](bool checked) {
+            Q_UNUSED(checked)
+            button->setText(QChar(fa::expand));
+        }
+    );
 
     rightWidget->setContentsMargins(0, 0, 0, 0);
     statusBarLayout->addWidget(rightWidget, 1, 2, 1, 1, Qt::AlignRight);
@@ -1329,6 +1272,146 @@ void MainWindow::buildStatusBar()
 
     this->statusBar()->addWidget(container, 1);
     this->statusBar()->setSizeGripEnabled(false);
+}
+
+void MainWindow::registerActionHandlers()
+{
+    appActions->registerHandler(Actions::NewFile,
+        [this]() {
+            documentManager->close();
+        }
+    );
+    appActions->registerHandler(Actions::OpenFile,
+        [this]() {
+            documentManager->open();
+        }
+    );
+
+    appActions->registerHandler(Actions::ReopenLast, documentManager, &DocumentManager::reopenLastClosedFile);
+
+    for (QAction *action : recentFilesActions) {
+        appActions->registerHandler(
+            action->objectName(),
+            [this, action]() {
+                // Use the action's data for access to the actual file path, since
+                // KDE Plasma will add a keyboard accelerator to the action's text
+                // by inserting an ampersand (&) into it.
+                //
+                if (nullptr != action) {
+                    documentManager->open(action->data().toString());
+                }
+
+                refreshRecentFiles();
+            }
+        );
+    }
+
+    appActions->registerHandler(Actions::Save,
+        [this]() {
+            documentManager->save();
+        }
+    );
+    appActions->registerHandler(Actions::SaveAs,
+        [this]() {
+            documentManager->saveAs();
+        }
+    );
+    appActions->registerHandler(Actions::RenameFile, documentManager, &DocumentManager::rename);
+    appActions->registerHandler(Actions::ReloadFile, documentManager, &DocumentManager::reload);
+    appActions->registerHandler(Actions::ExportFile, documentManager, &DocumentManager::exportFile);
+    appActions->registerHandler(Actions::Quit, this, &MainWindow::quitApplication);
+    appActions->registerHandler(Actions::Undo, (QPlainTextEdit*)editor, &MarkdownEditor::undo);
+    appActions->registerHandler(Actions::Redo, (QPlainTextEdit*)editor, &MarkdownEditor::redo);
+    appActions->registerHandler(Actions::Cut, (QPlainTextEdit*)editor, &MarkdownEditor::cut);
+    appActions->registerHandler(Actions::Copy, (QPlainTextEdit*)editor, &MarkdownEditor::copy);
+    appActions->registerHandler(Actions::Paste, (QPlainTextEdit*)editor, &MarkdownEditor::paste);
+    appActions->registerHandler(Actions::CopyHtml, this, &MainWindow::copyHtml);
+    appActions->registerHandler(Actions::InsertImage, this, &MainWindow::insertImage);
+    appActions->registerHandler(Actions::Find, findReplace, &FindReplace::showFindView);
+    appActions->registerHandler(Actions::Replace, findReplace, &FindReplace::showReplaceView);
+    appActions->registerHandler(Actions::FindNext, findReplace, &FindReplace::findNext);
+    appActions->registerHandler(Actions::FindPrevious, findReplace, &FindReplace::findPrevious);
+    appActions->registerHandler(Actions::SpellCheck, editor, &MarkdownEditor::runSpellChecker);
+    appActions->registerHandler(Actions::Bold, editor, &MarkdownEditor::bold);
+    appActions->registerHandler(Actions::Italic, editor, &MarkdownEditor::italic);
+    appActions->registerHandler(Actions::Strikethrough, editor, &MarkdownEditor::strikethrough);
+    appActions->registerHandler(Actions::HtmlComment, editor, &MarkdownEditor::insertComment);
+    appActions->registerHandler(Actions::Indent, editor, &MarkdownEditor::indentText);
+    appActions->registerHandler(Actions::Unindent, editor, &MarkdownEditor::unindentText);
+    appActions->registerHandler(Actions::BlockQuote, editor, &MarkdownEditor::createBlockquote);
+    appActions->registerHandler(Actions::StripBlockQuote, editor, &MarkdownEditor::removeBlockquote);
+    appActions->registerHandler(Actions::BulletListAsterisk, editor, &MarkdownEditor::createBulletListWithAsteriskMarker);
+    appActions->registerHandler(Actions::BulletListMinus, editor, &MarkdownEditor::createBulletListWithMinusMarker);
+    appActions->registerHandler(Actions::BulletListPlus, editor, &MarkdownEditor::createBulletListWithPlusMarker);
+    appActions->registerHandler(Actions::NumberedListPeriod, editor, &MarkdownEditor::createNumberedListWithPeriodMarker);
+    appActions->registerHandler(Actions::NumberedListParenthesis, editor, &MarkdownEditor::createNumberedListWithParenthesisMarker);
+    appActions->registerHandler(Actions::TaskList, editor, &MarkdownEditor::createTaskList);
+    appActions->registerHandler(Actions::ToggleTaskComplete, editor, &MarkdownEditor::toggleTaskComplete);
+    appActions->registerHandler(Actions::ToggleFullScreen, this, &MainWindow::toggleFullScreen);
+    appActions->registerHandler(Actions::ToggleHtmlPreview, this, &MainWindow::toggleHtmlPreview);
+    appActions->registerHandler(Actions::ToggleSidebar, this, &MainWindow::toggleSidebarVisible);
+    appActions->registerHandler(Actions::ToggleHemingwayMode, this, &MainWindow::toggleHemingwayMode);
+    appActions->registerHandler(Actions::ToggleDistractionFreeMode, this, &MainWindow::toggleFocusMode);
+
+    appActions->registerHandler(
+        Actions::ToggleDarkMode,
+        [this](bool checked) {
+            appSettings->setDarkModeEnabled(checked);
+            applyTheme();
+        }
+    );
+
+    appActions->registerHandler(
+        Actions::ShowOutline,
+        [this]() {
+            sidebar->setVisible(true);
+            sidebar->setCurrentTabIndex(OutlineSidebarTab);
+        }
+    );
+
+    appActions->registerHandler(
+        Actions::ShowSessionStatistics,
+        [this]() {
+            sidebar->setVisible(true);
+            sidebar->setCurrentTabIndex(SessionStatsSidebarTab);
+        }
+    );
+
+    appActions->registerHandler(
+        Actions::ShowDocumentStatistics,
+        [this]() {
+            sidebar->setVisible(true);
+            sidebar->setCurrentTabIndex(DocumentStatsSidebarTab);
+        }
+    );
+
+    appActions->registerHandler(
+        Actions::ShowCheatSheet,
+        [this]() {
+            sidebar->setVisible(true);
+            sidebar->setCurrentTabIndex(CheatSheetSidebarTab);
+        }
+    );
+
+    appActions->registerHandler(Actions::ZoomIn, editor, &MarkdownEditor::increaseFontSize);
+    appActions->registerHandler(Actions::ZoomOut, editor, &MarkdownEditor::decreaseFontSize);
+    appActions->registerHandler(Actions::ShowThemes, this, &MainWindow::changeTheme);
+    appActions->registerHandler(Actions::ShowFonts, this, &MainWindow::changeFont);
+    appActions->registerHandler(Actions::ShowAppLanguages, this, &MainWindow::onSetLocale);
+    appActions->registerHandler(Actions::ShowPreviewOptions, this, &MainWindow::showPreviewOptions);
+    appActions->registerHandler(Actions::ShowPreferences, this, &MainWindow::openPreferencesDialog);
+    appActions->registerHandler(Actions::About, this, &MainWindow::showAbout);
+    appActions->registerHandler(Actions::AboutQt, []() { qApp->aboutQt(); } );
+    appActions->registerHandler(Actions::Documentation, this, &MainWindow::showQuickReferenceGuide);
+    appActions->registerHandler(Actions::Wiki, this, &MainWindow::showWikiPage);
+
+    // Initialize checked/unchecked states of any checkable actions.
+    appActions->action(Actions::ToggleFullScreen)->setChecked(this->isFullScreen());
+    appActions->action(Actions::ToggleHtmlPreview)->setChecked(appSettings->htmlPreviewVisible());
+    appActions->action(Actions::ToggleSidebar)->setChecked(appSettings->sidebarVisible());
+    appActions->action(Actions::ToggleDarkMode)->setChecked(appSettings->darkModeEnabled());
+    appActions->action(Actions::ToggleHemingwayMode)->setChecked(false);
+    appActions->action(Actions::ToggleDistractionFreeMode)->setChecked(false);
 }
 
 void MainWindow::buildSidebar()

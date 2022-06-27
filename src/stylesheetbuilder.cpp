@@ -346,20 +346,21 @@ void StyleSheetBuilder::buildStatusBarWidgetStyleSheet()
             << "pt; margin: 0px; padding: 5px; border: 0; background: transparent; color: "
             << this->m_interfaceTextColor.name()
             << " } "
-            << "QPushButton { padding: 5 5 5 5; margin: 0; border: 0; border-radius: 5px; "
+            << "QAbstractButton { padding: 5 5 5 5; margin: 0; border: 0; border-radius: 5px; "
             << "color: "
             << this->m_interfaceTextColor.name()
             << "; background-color: "
             << this->m_backgroundColor.name()
             << "; font-size: 16px; width: 32px } "
-            << "QPushButton:pressed, QPushButton:flat, QPushButton:checked, QPushButton:hover { padding: 5 5 5 5; margin: 0; color: "
+            << "QAbstractButton:pressed, QAbstractButton:flat, QAbstractButton:checked, QAbstractButton:hover { padding: 5 5 5 5; margin: 0; color: "
             << this->m_interfaceTextColor.name()
             << "; background-color: "
             << this->m_pressedColor.name()
             << " } "
-            << "QPushButton#showSidebarButton:hover { color: "
+            << "QToolButton#showSidebarButton:hover { color: "
             << this->m_foregroundColor.name()
             << "; background-color: transparent }"
+            << "QToolButton#showSidebarButton:checked { background-color: transparent }"
             << "QComboBox {"
             << "    height: 22px;"
             << "    border: 0px;"

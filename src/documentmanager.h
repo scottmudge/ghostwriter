@@ -137,7 +137,6 @@ signals:
     void documentClosed();
 
 public slots:
-
     /**
      * Sets whether auto-saving of the file is enabled.
      */

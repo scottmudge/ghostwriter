@@ -284,7 +284,7 @@ public slots:
      * Formats current task list item or selected task list items
      * as complete, checking them with an 'x'.
      */
-    bool toggleTaskComplete();
+    void toggleTaskComplete();
 
     /**
      * Sets whether large heading sizes are enabled.
