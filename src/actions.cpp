@@ -202,6 +202,31 @@ QAction * Actions::action(const QString &id) const
     return m_actions.value(id);
 }
 
+void Actions::addActionShortcutsToWidget(QWidget *widget)
+{
+    QMapIterator<QString, QAction*> i(m_actions);
+
+    while (i.hasNext()) {
+        i.next();
+        if (!i.value()->shortcut().isEmpty()) {
+            widget->addAction(i.value());
+        }
+    }
+}
+
+void Actions::invoke(const QString &id)
+{
+    QAction *action = this->action(id);
+
+    if (nullptr != action) {
+        if (action->isCheckable()) {
+            action->toggle();
+        } else {
+            action->trigger();
+        }
+    }
+}
+
 void Actions::printActions() const
 {
     QMapIterator<QString, QAction*> i(m_actions);

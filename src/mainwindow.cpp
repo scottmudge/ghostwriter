@@ -174,6 +174,7 @@ MainWindow::MainWindow(const QString &filePath, QWidget *parent)
         }
     }
 
+
     recentFilesActions.append(appActions->action(Actions::OpenRecent0));
     recentFilesActions.append(appActions->action(Actions::OpenRecent1));
     recentFilesActions.append(appActions->action(Actions::OpenRecent2));
@@ -401,9 +402,8 @@ void MainWindow::keyPressEvent(QKeyEvent *e)
 
     switch (key) {
     case Qt::Key_Escape:
-    case Qt::Key_F11:
         if (this->isFullScreen()) {
-            toggleFullScreen(false);
+            appActions->invoke(Actions::ToggleFullScreen);
         }
         break;
     case Qt::Key_Alt:
@@ -1276,6 +1276,16 @@ void MainWindow::buildStatusBar()
 
 void MainWindow::registerActionHandlers()
 {
+    // Initialize checked/unchecked states of any checkable actions.
+    // Note: Need to do this before registering handlers to prevent the handlers
+    // from being invoked.
+    appActions->action(Actions::ToggleFullScreen)->setChecked(this->isFullScreen());
+    appActions->action(Actions::ToggleHtmlPreview)->setChecked(appSettings->htmlPreviewVisible());
+    appActions->action(Actions::ToggleSidebar)->setChecked(appSettings->sidebarVisible());
+    appActions->action(Actions::ToggleDarkMode)->setChecked(appSettings->darkModeEnabled());
+    appActions->action(Actions::ToggleHemingwayMode)->setChecked(false);
+    appActions->action(Actions::ToggleDistractionFreeMode)->setChecked(false);
+
     appActions->registerHandler(Actions::NewFile,
         [this]() {
             documentManager->close();
@@ -1405,13 +1415,9 @@ void MainWindow::registerActionHandlers()
     appActions->registerHandler(Actions::Documentation, this, &MainWindow::showQuickReferenceGuide);
     appActions->registerHandler(Actions::Wiki, this, &MainWindow::showWikiPage);
 
-    // Initialize checked/unchecked states of any checkable actions.
-    appActions->action(Actions::ToggleFullScreen)->setChecked(this->isFullScreen());
-    appActions->action(Actions::ToggleHtmlPreview)->setChecked(appSettings->htmlPreviewVisible());
-    appActions->action(Actions::ToggleSidebar)->setChecked(appSettings->sidebarVisible());
-    appActions->action(Actions::ToggleDarkMode)->setChecked(appSettings->darkModeEnabled());
-    appActions->action(Actions::ToggleHemingwayMode)->setChecked(false);
-    appActions->action(Actions::ToggleDistractionFreeMode)->setChecked(false);
+    // Add all actions with shortcuts to this window to ensure that the
+    // shortcuts activate their respective actions when the menu bar is hidden.
+    appActions->addActionShortcutsToWidget(this);
 }
 
 void MainWindow::buildSidebar()

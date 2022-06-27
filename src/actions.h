@@ -103,6 +103,10 @@ public:
         Receiver *receiver,
         void(Receiver::*method)(bool checked));
 
+    void addActionShortcutsToWidget(QWidget *widget);
+
+    void invoke(const QString &id);
+
     /***
      * Convenience method that prints a descriptive list of actions for
      * debugging/documentation purposes.
