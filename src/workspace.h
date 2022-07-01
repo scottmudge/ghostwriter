@@ -29,11 +29,10 @@
 namespace ghostwriter
 {
 /**
- * Workspace window that displays a set of directories and editors/documents
- * being viewed/edited.
+ * Contains the set of editors/documents being viewed/edited.
  */
 class WorkspacePrivate;
-class Workspace : public QMainWindow
+class Workspace : public QObject
 {
     Q_OBJECT
     Q_DECLARE_PRIVATE(Workspace)
@@ -49,13 +48,18 @@ public:
      */
     virtual ~Workspace();
     
-    void open(const QString &path, draft = false);
-    void close();
-    
     MarkdownDocument * activeDocument() const;
-    QList<MarkdownDocument> documents() const;
+    MarkdownEditor * activeEditor() const;
+    QList<MarkdownEditor*> editors() const;
     
-    void applyTheme(const Theme& theme);
+    void addEditor(MarkdownEditor *editor);
+    void removeEditor(MarkdownEditor *editor);
+    
+signals:
+    void activeEditorChanged(int index);
+
+public slots:
+    void setActiveEditor(int index);
 
 private:
     QScopedPointer<WorkspacePrivate> d_ptr;

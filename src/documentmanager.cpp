@@ -63,6 +63,8 @@ public:
     {
 
     }
+    
+    Workspace *workspace;
 
     const QString draftName = QObject::tr("untitled");
 
@@ -180,14 +182,16 @@ const QString DocumentManagerPrivate::FILE_CHOOSER_FILTER =
 
 DocumentManager::DocumentManager
 (
-    MarkdownEditor *editor,
+    Workspace *workspace,
     QObject *parent
 ) : QObject(parent),
     d_ptr(new DocumentManagerPrivate(this))
 {
     Q_D(DocumentManager);
     
-    d->editor = editor;
+    Q_ASSERT(nullptr != workspace);
+    
+    d->workspace = workspace;
     d->fileHistoryEnabled = true;
     d->createBackupOnSave = true;
     d->saveInProgress = false;
@@ -225,7 +229,7 @@ DocumentManager::DocumentManager
         [d](const QString &err) {
             if (!err.isNull() && !err.isEmpty()) {
                 MessageBoxHelper::critical(
-                    d->editor,
+                    d->workspace->activeEditor(),
                     QObject::tr("Error saving %1").arg(d->document->filePath()),
                     err
                 );
@@ -362,7 +366,7 @@ void DocumentManager::open(const QString &filePath)
             path =
                 QFileDialog::getOpenFileName
                 (
-                    d->editor,
+                    d->workspace->activeEditor(),
                     tr("Open File"),
                     startingDirectory,
                     DocumentManagerPrivate::FILE_CHOOSER_FILTER
@@ -375,7 +379,7 @@ void DocumentManager::open(const QString &filePath)
             if (!fileInfo.isReadable()) {
                 MessageBoxHelper::critical
                 (
-                    d->editor,
+                    d->workspace->activeEditor(),
                     tr("Could not open %1").arg(path),
                     tr("Permission denied.")
                 );
@@ -384,7 +388,7 @@ void DocumentManager::open(const QString &filePath)
             }
 
             QString oldFilePath = d->document->filePath();
-            int oldCursorPosition = d->editor->textCursor().position();
+            int oldCursorPosition = d->workspace->activeEditor()->textCursor().position();
             bool oldFileWasNew = d-> document->isNew();
 
             if (!d->loadFile(path)) {
@@ -393,7 +397,7 @@ void DocumentManager::open(const QString &filePath)
                 //
                 return;
             } else if (oldFilePath == d->document->filePath()) {
-                d->editor->navigateDocument(oldCursorPosition);
+                d->workspace->activeEditor()->navigateDocument(oldCursorPosition);
             } else if (d->fileHistoryEnabled) {
                 if (!oldFileWasNew) {
                     DocumentHistory history;
@@ -437,7 +441,7 @@ void DocumentManager::reload()
             int response =
                 MessageBoxHelper::question
                 (
-                    d->editor,
+                    d->workspace->activeEditor(),
                     tr("The document has been modified."),
                     tr("Discard changes?"),
                     QMessageBox::Yes | QMessageBox::No,
@@ -449,12 +453,12 @@ void DocumentManager::reload()
             }
         }
 
-        QTextCursor cursor = d->editor->textCursor();
+        QTextCursor cursor = d->workspace->activeEditor()->textCursor();
         int pos = cursor.position();
 
         if (d->loadFile(d->document->filePath())) {
             cursor.setPosition(pos);
-            d->editor->setTextCursor(cursor);
+            d->workspace->activeEditor()->setTextCursor(cursor);
         }
     }
 }
@@ -469,7 +473,7 @@ void DocumentManager::rename()
         QString filePath =
             QFileDialog::getSaveFileName
             (
-                d->editor,
+                d->workspace->activeEditor(),
                 tr("Rename File"),
                 QString(),
                 DocumentManagerPrivate::FILE_CHOOSER_FILTER
@@ -486,7 +490,7 @@ void DocumentManager::rename()
                 if (!success) {
                     MessageBoxHelper::critical
                     (
-                        d->editor,
+                        d->workspace->activeEditor(),
                         tr("Failed to rename %1").arg(d->document->filePath()),
                         file.errorString()
                     );
@@ -499,7 +503,7 @@ void DocumentManager::rename()
             if (!success) {
                 MessageBoxHelper::critical
                 (
-                    d->editor,
+                    d->workspace->activeEditor(),
                     tr("Failed to rename %1").arg(d->document->filePath()),
                     file.errorString()
                 );
@@ -537,7 +541,7 @@ bool DocumentManager::saveAs()
     QString filePath =
         QFileDialog::getSaveFileName
         (
-            d->editor,
+            d->workspace->activeEditor(),
             tr("Save File"),
             startingDirectory,
             DocumentManagerPrivate::FILE_CHOOSER_FILTER
@@ -565,7 +569,7 @@ bool DocumentManager::close()
         // so we can store history information about it.
         //
         QString filePath = d->document->filePath();
-        int cursorPosition = d->editor->textCursor().position();
+        int cursorPosition = d->workspace->activeEditor()->textCursor().position();
         bool documentIsNew = d->document->isNew();
 
         // Set up a new, untitled document.  Note that the document
@@ -581,12 +585,12 @@ bool DocumentManager::close()
         //
         QTextCursor cursor(d->document);
         cursor.setPosition(0);
-        d->editor->setTextCursor(cursor);
+        d->workspace->activeEditor()->setTextCursor(cursor);
 
         d->document->clear();
         d->document->clearUndoRedoStacks();
 
-        d->editor->setReadOnly(false);
+        d->workspace->activeEditor()->setReadOnly(false);
         d->document->setReadOnly(false);
         d->setFilePath(QString());
         d->document->setModified(false);
