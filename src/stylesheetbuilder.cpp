@@ -350,7 +350,8 @@ void StyleSheetBuilder::buildStatusBarWidgetStyleSheet()
             << "color: "
             << this->m_interfaceTextColor.name()
             << "; background-color: "
-            << this->m_backgroundColor.name()
+            //<< this->m_backgroundColor.name()
+            << "#ffffff"
             << "; font-size: 16px; width: 32px } "
             << "QPushButton:pressed, QPushButton:flat, QPushButton:checked, QPushButton:hover { padding: 5 5 5 5; margin: 0; color: "
             << this->m_interfaceTextColor.name()

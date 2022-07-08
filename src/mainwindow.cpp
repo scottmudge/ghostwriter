@@ -40,6 +40,7 @@
 #include <QStatusBar>
 #include <QTemporaryFile>
 #include <QTextDocumentFragment>
+#include <QGraphicsColorizeEffect>
 
 #include "3rdparty/QtAwesome/QtAwesome.h"
 
@@ -458,7 +459,7 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event)
             this->menuBar()->hide();
         } else if (QEvent::MouseMove == event->type()) {
             QMouseEvent *mouseEvent = static_cast<QMouseEvent *>(event);
-            if ((mouseEvent->globalY()) <= 0 && !this->menuBar()->isVisible()) {
+            if ((mouseEvent->globalPosition().y()) <= 0 && !this->menuBar()->isVisible()) {
                 this->menuBar()->show();
             }
         } else if ((this == obj) 
@@ -1288,6 +1289,9 @@ void MainWindow::buildStatusBar()
     connect(button, SIGNAL(toggled(bool)), this, SLOT(toggleHtmlPreview(bool)));
     rightLayout->addWidget(button, 0, Qt::AlignRight);
     statusBarWidgets.append(button);
+    QGraphicsColorizeEffect *e = new QGraphicsColorizeEffect(button);
+    e->setColor(Qt::red);
+    button->setGraphicsEffect(e);
 
     this->connect
     (
