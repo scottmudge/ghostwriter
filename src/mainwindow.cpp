@@ -44,6 +44,7 @@
 
 #include "3rdparty/QtAwesome/QtAwesome.h"
 
+#include "actions.h"
 #include "documenthistory.h"
 #include "exporter.h"
 #include "exporterfactory.h"
