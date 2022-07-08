@@ -1,5 +1,6 @@
 /***********************************************************************
  *
+ * Copyright (C) 2022 wereturtle
  * Copyright (C) 2013 Graeme Gott <graeme@gottcode.org>
  *
  * This program is free software: you can redistribute it and/or modify
@@ -17,18 +18,21 @@
  *
  ***********************************************************************/
 
-#ifndef DICTIONARY_PROVIDER_HUNSPELL_H
-#define DICTIONARY_PROVIDER_HUNSPELL_H
+#ifndef HUNSPELL_PROVIDER_H
+#define HUNSPELL_PROVIDER_H
 
-#include "abstract_dictionary_provider.h"
+#include "dictionaryprovider.h"
 
-class QString;
-class QStringList;
+#include <QString>
+#include <QStringList>
+#include <QStringRef>
 
-class DictionaryProviderHunspell : public AbstractDictionaryProvider
+namespace ghostwriter
+{
+class HunspellProvider : public DictionaryProvider
 {
 public:
-	DictionaryProviderHunspell();
+	HunspellProvider();
 
 	bool isValid() const
 	{
@@ -36,10 +40,11 @@ public:
 	}
 
 	QStringList availableDictionaries() const;
-	AbstractDictionary* requestDictionary(const QString& language) const;
+	Dictionary *requestDictionary(const QString &language) const;
 
 	void setIgnoreNumbers(bool ignore);
 	void setIgnoreUppercase(bool ignore);
 };
+} // namespace ghostwriter
 
 #endif

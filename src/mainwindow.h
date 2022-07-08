@@ -21,10 +21,12 @@
 #define MAIN_WINDOW_H
 
 #include <QLabel>
+#include <QMainWindow>
 #include <QSettings>
 #include <QSplitter>
 
 #include "3rdparty/QtAwesome/QtAwesome.h"
+#include "spelling/spellcheckdecorator.h"
 
 #include "appsettings.h"
 #include "documentmanager.h"
@@ -100,6 +102,7 @@ private slots:
 private:
     QtAwesome *awesome;
     MarkdownEditor *editor;
+    SpellCheckDecorator *spelling;
     FindReplace* findReplace;
     QSplitter *previewSplitter;
     QSplitter *splitter;

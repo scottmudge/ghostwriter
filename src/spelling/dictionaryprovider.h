@@ -1,6 +1,7 @@
 /***********************************************************************
  *
  * Copyright (C) 2013 Graeme Gott <graeme@gottcode.org>
+ * Copyright (C) 2022 wereturtle
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,25 +18,28 @@
  *
  ***********************************************************************/
 
-#ifndef ABSTRACT_DICTIONARY_PROVIDER_H
-#define ABSTRACT_DICTIONARY_PROVIDER_H
+#ifndef DICTIONARY_PROVIDER_H
+#define DICTIONARY_PROVIDER_H
 
-class AbstractDictionary;
+#include <QString>
+#include <QStringList>
 
-class QString;
-class QStringList;
+#include "dictionary.h"
 
-class AbstractDictionaryProvider
+namespace ghostwriter
+{
+class DictionaryProvider
 {
 public:
-	virtual ~AbstractDictionaryProvider() { }
+	virtual ~DictionaryProvider() { }
 
 	virtual bool isValid() const = 0;
 	virtual QStringList availableDictionaries() const = 0;
-	virtual AbstractDictionary* requestDictionary(const QString& language) const = 0;
+	virtual Dictionary * requestDictionary(const QString &language) const = 0;
 
 	virtual void setIgnoreNumbers(bool ignore) = 0;
 	virtual void setIgnoreUppercase(bool ignore) = 0;
 };
+} // namespace ghostwriter
 
 #endif

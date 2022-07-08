@@ -208,7 +208,11 @@ DocumentManager::DocumentManager
 
     // Markdown files need to be in UTF-8, since most Markdown processors
     // (i.e., Pandoc, et. al.) can only read UTF-8 encoded text files.
-    d->writer->setCodec(QTextCodec::codecForName("UTF-8"));
+#if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
+    d->writer->setEncoding(QTextCodec::codecForName("UTF-8"));
+#else
+    d->writer->setEncoding(QStringConverter::Utf8);
+#endif
 
     this->connect(
         d->writer,
@@ -748,7 +752,11 @@ bool DocumentManagerPrivate::loadFile(const QString &filePath)
     // what the user is opening by default.  Enable autodetection
     // of of UTF-16 or UTF-32 BOM in case the file isn't UTF-8 encoded.
     //
+#if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
     inStream.setCodec("UTF-8");
+#else
+    inStream.setEncoding(QStringConverter::Utf8);
+#endif
     inStream.setAutoDetectUnicode(true);
 
     QString text = inStream.readAll();
@@ -762,6 +770,8 @@ bool DocumentManagerPrivate::loadFile(const QString &filePath)
         inputFile.close();
         return false;
     }
+
+    inputFile.close();
     
     setFilePath(filePath);
     editor->setPlainText(text);
@@ -769,8 +779,6 @@ bool DocumentManagerPrivate::loadFile(const QString &filePath)
     emit q->operationUpdate();
 
     document->setUndoRedoEnabled(true);
-
-    inputFile.close();
 
     if (fileHistoryEnabled) {
         DocumentHistory history;

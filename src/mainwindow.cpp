@@ -54,9 +54,10 @@
 #include "previewoptionsdialog.h"
 #include "sandboxedwebpage.h"
 #include "simplefontdialog.h"
+#include "spelling/dictionarymanager.h"
+#include "spelling/spellcheckdecorator.h"
 #include "stylesheetbuilder.h"
 #include "themeselectiondialog.h"
-#include "spelling/dictionary_manager.h"
 
 namespace ghostwriter
 {
@@ -103,11 +104,15 @@ MainWindow::MainWindow(const QString &filePath, QWidget *parent)
     editor->setPlainText("");
     editor->setEditorWidth((EditorWidth) appSettings->editorWidth());
     editor->setEditorCorners((InterfaceStyle) appSettings->interfaceStyle());
-    editor->setSpellCheckEnabled(appSettings->liveSpellCheckEnabled());
     editor->setItalicizeBlockquotes(appSettings->italicizeBlockquotes());
     editor->setTabulationWidth(appSettings->tabWidth());
     editor->setInsertSpacesForTabs(appSettings->insertSpacesForTabsEnabled());
-    connect(editor, SIGNAL(fontSizeChanged(int)), this, SLOT(onFontSizeChanged(int)));
+
+    connect(editor,
+        &MarkdownEditor::fontSizeChanged,
+        this,
+        &MainWindow::onFontSizeChanged
+    );
     this->setFocusProxy(editor);
 
     // We need to set an empty style for the editor's scrollbar in order for the
@@ -117,6 +122,9 @@ MainWindow::MainWindow(const QString &filePath, QWidget *parent)
     //
     editor->verticalScrollBar()->setStyle(new QCommonStyle());
     editor->horizontalScrollBar()->setStyle(new QCommonStyle());
+
+    spelling = new SpellCheckDecorator(editor);
+    spelling->setLiveSpellCheckEnabled(appSettings->liveSpellCheckEnabled());
 
     buildSidebar();
 
@@ -168,12 +176,11 @@ MainWindow::MainWindow(const QString &filePath, QWidget *parent)
             lastFile = recentFiles.first();
         }
 
-        if (QFileInfo(lastFile).exists()) {
+        if (QFileInfo::exists(lastFile)) {
             fileToOpen = lastFile;
             recentFiles.removeAll(lastFile);
         }
     }
-
 
     recentFilesActions.append(appActions->action(Actions::OpenRecent0));
     recentFilesActions.append(appActions->action(Actions::OpenRecent1));
@@ -230,8 +237,8 @@ MainWindow::MainWindow(const QString &filePath, QWidget *parent)
     connect(appSettings, SIGNAL(hideMenuBarInFullScreenChanged(bool)), this, SLOT(toggleHideMenuBarInFullScreen(bool)));
     connect(appSettings, SIGNAL(fileHistoryChanged(bool)), this, SLOT(toggleFileHistoryEnabled(bool)));
     connect(appSettings, SIGNAL(displayTimeInFullScreenChanged(bool)), this, SLOT(toggleDisplayTimeInFullScreen(bool)));
-    connect(appSettings, SIGNAL(dictionaryLanguageChanged(QString)), editor, SLOT(setDictionary(QString)));
-    connect(appSettings, SIGNAL(liveSpellCheckChanged(bool)), editor, SLOT(setSpellCheckEnabled(bool)));
+    connect(appSettings, SIGNAL(dictionaryLanguageChanged(QString)), spelling, SLOT(setDictionary(QString)));
+    connect(appSettings, SIGNAL(liveSpellCheckChanged(bool)), spelling, SLOT(setSpellCheckEnabled(bool)));
     connect(appSettings, SIGNAL(editorWidthChanged(EditorWidth)), this, SLOT(changeEditorWidth(EditorWidth)));
     connect(appSettings, SIGNAL(interfaceStyleChanged(InterfaceStyle)), this, SLOT(changeInterfaceStyle(InterfaceStyle)));
     connect(appSettings, SIGNAL(previewTextFontChanged(QFont)), this, SLOT(applyTheme()));
@@ -246,10 +253,10 @@ MainWindow::MainWindow(const QString &filePath, QWidget *parent)
 
     // If we have an available dictionary, then set up spell checking.
     if (!language.isNull() && !language.isEmpty()) {
-        editor->setDictionary(language);
-        editor->setSpellCheckEnabled(appSettings->liveSpellCheckEnabled());
+        spelling->setDictionary(language);
+        spelling->setLiveSpellCheckEnabled(appSettings->liveSpellCheckEnabled());
     } else {
-        editor->setSpellCheckEnabled(false);
+        spelling->setLiveSpellCheckEnabled(false);
     }
 
     this->connect
@@ -359,6 +366,8 @@ MainWindow::MainWindow(const QString &filePath, QWidget *parent)
     if (!fileToOpen.isNull() && !fileToOpen.isEmpty()) {
         documentManager->open(fileToOpen);
     }
+
+    spelling->startLiveSpellCheck();
 }
 
 MainWindow::~MainWindow()
@@ -474,8 +483,8 @@ void MainWindow::quitApplication()
         windowSettings.setValue(GW_SPLITTER_GEOMETRY_KEY, splitter->saveState());
         windowSettings.sync();
 
-        DictionaryManager::instance().addProviders();
-        DictionaryManager::instance().setDefaultLanguage(language);
+        DictionaryManager::instance()->addProviders();
+        DictionaryManager::instance()->setDefaultLanguage(language);
 
         this->editor->document()->disconnect();
         this->editor->disconnect();
@@ -1115,13 +1124,13 @@ void MainWindow::buildStatusBar()
 
     QHBoxLayout *leftLayout = new QHBoxLayout(leftWidget);
     leftWidget->setLayout(leftLayout);
-    leftLayout->setMargin(0);
+    leftLayout->setContentsMargins(0,0,0,0);
     QHBoxLayout *midLayout = new QHBoxLayout(midWidget);
     midWidget->setLayout(midLayout);
-    midLayout->setMargin(0);
+    midLayout->setContentsMargins(0,0,0,0);
     QHBoxLayout *rightLayout = new QHBoxLayout(rightWidget);
     rightWidget->setLayout(rightLayout);
-    rightLayout->setMargin(0);
+    rightLayout->setContentsMargins(0,0,0,0);
 
     // Add left-most widgets to status bar.
     QFont buttonFont(this->awesome->font(style::stfas, 16));
@@ -1341,7 +1350,7 @@ void MainWindow::registerActionHandlers()
     appActions->registerHandler(Actions::Replace, findReplace, &FindReplace::showReplaceView);
     appActions->registerHandler(Actions::FindNext, findReplace, &FindReplace::findNext);
     appActions->registerHandler(Actions::FindPrevious, findReplace, &FindReplace::findPrevious);
-    appActions->registerHandler(Actions::SpellCheck, editor, &MarkdownEditor::runSpellChecker);
+    appActions->registerHandler(Actions::SpellCheck, spelling, &SpellCheckDecorator::runSpellCheck);
     appActions->registerHandler(Actions::Bold, editor, &MarkdownEditor::bold);
     appActions->registerHandler(Actions::Italic, editor, &MarkdownEditor::italic);
     appActions->registerHandler(Actions::Strikethrough, editor, &MarkdownEditor::strikethrough);
@@ -1636,6 +1645,7 @@ void MainWindow::applyTheme()
 
     editor->setColorScheme(colorScheme);
     editor->setStyleSheet(styler.editorStyleSheet());
+    spelling->setErrorColor(colorScheme.error);
 
     // Do not call this->setStyleSheet().  Calling it more than once in a run
     // (i.e., when changing a theme) causes a crash in Qt 5.11.  Instead,

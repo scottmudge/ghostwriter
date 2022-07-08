@@ -1,6 +1,7 @@
 /***********************************************************************
  *
  * Copyright (C) 2013 Graeme Gott <graeme@gottcode.org>
+ * Copyright (C) 2022 wereturtle
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,15 +18,17 @@
  *
  ***********************************************************************/
 
-#ifndef DICTIONARY_PROVIDER_NSSPELLCHECKER_H
-#define DICTIONARY_PROVIDER_NSSPELLCHECKER_H
+#ifndef NSSPELLCHECKER_PROVIDER_H
+#define NSSPELLCHECKER_PROVIDER_H
 
-#include "abstract_dictionary_provider.h"
+#include "dictionaryprovider.h"
 
-class QString;
-class QStringList;
+#include <QString>
+#include <QStringList>
 
-class DictionaryProviderNSSpellChecker : public AbstractDictionaryProvider
+namespace ghostwriter
+{
+class NSSpellCheckerProvider : public DictionaryProvider
 {
 public:
 	bool isValid() const
@@ -34,10 +37,11 @@ public:
 	}
 
 	QStringList availableDictionaries() const;
-	AbstractDictionary* requestDictionary(const QString& language) const;
+	AbstractDictionary* requestDictionary(const QString &language) const;
 
 	void setIgnoreNumbers(bool ignore);
 	void setIgnoreUppercase(bool ignore);
 };
+} // namespace ghostwriter
 
 #endif

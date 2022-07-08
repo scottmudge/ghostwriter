@@ -26,6 +26,7 @@
 #include <QRegularExpression>
 #include <QStaticText>
 #include <QString>
+#include <QStringRef>
 #include <QSyntaxHighlighter>
 #include <QTextCharFormat>
 #include <QTextDocument>
@@ -39,8 +40,6 @@
 
 #include "markdownhighlighter.h"
 #include "markdownstates.h"
-#include "spelling/dictionary_ref.h"
-#include "spelling/dictionary_manager.h"
 
 namespace ghostwriter
 {
@@ -52,10 +51,7 @@ class MarkdownHighlighterPrivate
 public:
     MarkdownHighlighterPrivate(MarkdownHighlighter *highlighter) :
         q_ptr(highlighter),
-        dictionary(DictionaryManager::instance().requestDictionary()),
         inBlockquote(false),
-        spellCheckEnabled(false),
-        typingPaused(true),
         useUndlerlineForEmphasis(false)
     {
         ;
@@ -71,15 +67,12 @@ public:
     ColorScheme colors;
     QTextBlock currentLine;
     QTextCharFormat defaultFormat;
-    DictionaryRef dictionary;
     MarkdownEditor *editor;
     QRegularExpression heading1SetextRegex;
     QRegularExpression heading2SetextRegex;
     bool inBlockquote;
     QRegularExpression referenceDefinitionRegex;
     QRegularExpression inlineHtmlCommentRegex;
-    bool spellCheckEnabled;
-    bool typingPaused;
     bool useLargeHeadings;
     bool useUndlerlineForEmphasis;
     bool italicizeBlockquotes;
@@ -90,7 +83,6 @@ public:
     void applyFormattingForNode(const MarkdownNode *const node);
     void highlightRefLinks(const int pos, const int length);
     void setupHeadingFontSize(bool useLargeHeadings);
-    void spellCheck(const QString &text);
 };
 
 MarkdownHighlighter::MarkdownHighlighter
@@ -104,8 +96,6 @@ MarkdownHighlighter::MarkdownHighlighter
 
     d->colors = colors;
     d->editor = editor;
-    d->spellCheckEnabled = false;
-    d->typingPaused = true;
     d->useUndlerlineForEmphasis = false;
     d->italicizeBlockquotes = false;
     d->inBlockquote = false;
@@ -113,10 +103,6 @@ MarkdownHighlighter::MarkdownHighlighter
     setDocument(editor->document());
     d->referenceDefinitionRegex.setPattern("^\\s*\\[(.+?)[^\\\\]\\]:");
     d->inlineHtmlCommentRegex.setPattern("^\\s*<\\!--.*-->\\s*$");
-
-    connect(editor, SIGNAL(typingResumed()), this, SLOT(onTypingResumed()));
-    connect(editor, SIGNAL(typingPausedScaled()), this, SLOT(onTypingPaused()));
-    connect(editor, SIGNAL(cursorPositionChanged()), this, SLOT(onCursorPositionChanged()));
 
     connect
     (
@@ -246,21 +232,6 @@ void MarkdownHighlighter::highlightBlock(const QString &text)
         format.setForeground(d->colors.listMarkup);
         this->setFormat(currentBlock().text().length() - 2, 2, format);
     }
-
-    if (d->spellCheckEnabled) {
-        d->spellCheck(text);
-    }
-}
-
-void MarkdownHighlighter::setDictionary(const DictionaryRef &dictionary)
-{
-    Q_D(MarkdownHighlighter);
-
-    d->dictionary = dictionary;
-
-    if (d->spellCheckEnabled) {
-        rehighlight();
-    }
 }
 
 void MarkdownHighlighter::increaseFontSize()
@@ -326,90 +297,10 @@ void MarkdownHighlighter::setFont(const QString &fontFamily, const double fontSi
     rehighlight();
 }
 
-void MarkdownHighlighter::setSpellCheckEnabled(const bool enabled)
-{
-    Q_D(MarkdownHighlighter);
-    
-    d->spellCheckEnabled = enabled;
-    rehighlight();
-}
-
-void MarkdownHighlighter::onTypingResumed()
-{
-    Q_D(MarkdownHighlighter);
-    
-    d->typingPaused = false;
-}
-
-void MarkdownHighlighter::onTypingPaused()
-{
-    Q_D(MarkdownHighlighter);
-    
-    d->typingPaused = true;
-
-    if (d->spellCheckEnabled) {
-        QTextBlock block = document()->findBlock(d->editor->textCursor().position());
-        rehighlightBlock(block);
-    }
-}
-
-void MarkdownHighlighter::onCursorPositionChanged()
-{
-    Q_D(MarkdownHighlighter);
-    
-    if
-    (
-        d->spellCheckEnabled &&
-        (d->currentLine != d->editor->textCursor().block())
-    ) {
-        rehighlightBlock(d->currentLine);
-    }
-
-    d->currentLine = d->editor->textCursor().block();
-}
-
 void MarkdownHighlighter::onHighlightBlockAtPosition(int position)
 {    
     QTextBlock block = document()->findBlock(position);
     rehighlightBlock(block);
-}
-
-void MarkdownHighlighterPrivate::spellCheck(const QString &text)
-{
-    Q_Q(MarkdownHighlighter);
-    
-    int cursorPosition = editor->textCursor().position();
-    QTextBlock cursorPosBlock = q->document()->findBlock(cursorPosition);
-    int cursorPosInBlock = -1;
-
-    if (q->currentBlock() == cursorPosBlock) {
-        cursorPosInBlock = cursorPosition - cursorPosBlock.position();
-    }
-
-    QStringRef misspelledWord = dictionary.check(text, 0);
-
-    while (!misspelledWord.isNull()) {
-        int startIndex = misspelledWord.position();
-        int length = misspelledWord.length();
-
-        if (typingPaused || (cursorPosInBlock != (startIndex + length))) {
-            QTextCharFormat spellingErrorFormat = q->format(startIndex);
-            spellingErrorFormat.setUnderlineColor(colors.error);
-            spellingErrorFormat.setUnderlineStyle
-            (
-                (QTextCharFormat::UnderlineStyle)
-                QApplication::style()->styleHint
-                (
-                    QStyle::SH_SpellCheckUnderlineStyle
-                )
-            );
-
-            q->setFormat(startIndex, length, spellingErrorFormat);
-        }
-
-        startIndex += length;
-        misspelledWord = dictionary.check(text, startIndex);
-    }
 }
 
 void MarkdownHighlighterPrivate::applyFormattingForNode(const MarkdownNode *const node)
@@ -856,7 +747,7 @@ void MarkdownHighlighterPrivate::highlightRefLinks(const int pos, const int leng
     QTextCharFormat format = q->format(pos);
     format.setForeground(colors.link);
 
-    for (int i = pos; i < (pos + length) && (i < q->currentBlock().text()); i++) {
+    for (int i = pos; i < (pos + length) && (i < q->currentBlock().text().size()); i++) {
         if (skipNext) {
             skipNext = false;
             continue;

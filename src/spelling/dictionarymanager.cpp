@@ -1,6 +1,7 @@
 /***********************************************************************
  *
  * Copyright (C) 2009, 2010, 2011, 2012, 2013 Graeme Gott <graeme@gottcode.org>
+ * Copyright (C) 2022 wereturtle
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,40 +18,37 @@
  *
  ***********************************************************************/
 
-#include "dictionary_manager.h"
+#include "dictionarymanager.h"
 
 #ifndef Q_OS_MAC
-#include "dictionary_provider_hunspell.h"
-#include "dictionary_provider_voikko.h"
+#include "hunspellprovider.h"
 #else
-#include "dictionary_provider_nsspellchecker.h"
+#include "nsspellcheckerprovider.h"
 #endif
-#include "dictionary_ref.h"
 
 #include <QDir>
 #include <QFile>
+#include <QRegularExpression>
 #include <QTextStream>
 
 #include <algorithm>
 
-//-----------------------------------------------------------------------------
-
-namespace
+namespace ghostwriter
 {
 
-bool compareWords(const QString& s1, const QString& s2)
+bool compareWords(const QString &s1, const QString &s2)
 {
 	return s1.localeAwareCompare(s2) < 0;
 }
 
-class DictionaryFallback : public AbstractDictionary
+class DictionaryFallback : public Dictionary
 {
 public:
-	static AbstractDictionary** instance()
+	static Dictionary * instance()
 	{
 		static DictionaryFallback fallback;
-		static AbstractDictionary* fallback_ptr = &fallback;
-		return &fallback_ptr;
+		static Dictionary *fallback_ptr = &fallback;
+		return fallback_ptr;
 	}
 
 	bool isValid() const
@@ -58,30 +56,30 @@ public:
 		return true;
 	}
 
-	QStringRef check(const QString& string, int start_at) const
+	QStringRef check(const QString &string, int startAt) const
 	{
 		Q_UNUSED(string);
-		Q_UNUSED(start_at);
+		Q_UNUSED(startAt);
 		return QStringRef();
 	}
 
-	QStringList suggestions(const QString& word) const
+	QStringList suggestions(const QString &word) const
 	{
 		Q_UNUSED(word);
 		return QStringList();
 	}
 
-	void addToPersonal(const QString& word)
+	void addToPersonal(const QString &word)
 	{
 		Q_UNUSED(word);
 	}
 
-	void addToSession(const QStringList& words)
+	void addToSession(const QStringList &words)
 	{
 		Q_UNUSED(words);
 	}
 
-	void removeFromSession(const QStringList& words)
+	void removeFromSession(const QStringList &words)
 	{
 		Q_UNUSED(words);
 	}
@@ -92,129 +90,110 @@ private:
 	}
 };
 
-}
-
 QString DictionaryManager::m_path;
 
-//-----------------------------------------------------------------------------
-
-DictionaryManager& DictionaryManager::instance()
+DictionaryManager* DictionaryManager::instance()
 {
 	static DictionaryManager manager;
-	return manager;
+	return &manager;
 }
-
-//-----------------------------------------------------------------------------
 
 QStringList DictionaryManager::availableDictionaries() const
 {
 	QStringList result;
-	foreach (AbstractDictionaryProvider* provider, m_providers) {
+
+	for (DictionaryProvider* provider : m_providers) {
 		result += provider->availableDictionaries();
 	}
+
 	result.sort();
 	result.removeDuplicates();
 	return result;
 }
 
-//-----------------------------------------------------------------------------
-
-QString DictionaryManager::availableDictionary(const QString& language) const
+QString DictionaryManager::availableDictionary(const QString &language) const
 {
 	QStringList languages = availableDictionaries();
+
 	if (!languages.isEmpty() && !languages.contains(language)) {
-		int close = languages.indexOf(QRegExp(language.left(2) + ".*"));
+		int close = languages.indexOf(QRegularExpression(language.left(2) + ".*"));
 		return (close != -1) ? languages.at(close) : (languages.contains("en_US") ? "en_US" : languages.first());
 	} else {
 		return language;
 	}
 }
 
-//-----------------------------------------------------------------------------
-
 void DictionaryManager::add(const QString& word)
 {
 	QStringList words = personal();
+
     if (words.contains(word)) {
 		return;
 	}
+
 	words.append(word);
 	setPersonal(words);
 }
 
-//-----------------------------------------------------------------------------
-
 void DictionaryManager::addProviders()
 {
 #ifndef Q_OS_MAC
-	bool has_hunspell = false;
-	bool has_voikko = false;
+	bool hasHunspell = false;
 
-	foreach (AbstractDictionaryProvider* provider, m_providers) {
-		if (dynamic_cast<DictionaryProviderHunspell*>(provider) != NULL) {
-			has_hunspell = true;
-		} else if (dynamic_cast<DictionaryProviderVoikko*>(provider) != NULL) {
-			has_voikko = true;
+	for (DictionaryProvider *provider : m_providers) {
+		if (dynamic_cast<HunspellProvider*>(provider) != NULL) {
+			hasHunspell = true;
 		}
 	}
 
-	if (!has_hunspell) {
-		addProvider(new DictionaryProviderHunspell);
-	}
-	if (!has_voikko) {
-		addProvider(new DictionaryProviderVoikko);
+	if (!hasHunspell) {
+		addProvider(new HunspellProvider);
 	}
 #else
-	bool has_nsspellchecker = false;
+	bool hasNsSpellChecker = false;
 
-	foreach (AbstractDictionaryProvider* provider, m_providers) {
-		if (dynamic_cast<DictionaryProviderNSSpellChecker*>(provider) != NULL) {
-			has_nsspellchecker = true;
+	for (DictionaryProvider *provider : m_providers) {
+		if (dynamic_cast<NSSpellCheckerProvider*>(provider) != NULL) {
+			hasNsSpellChecker = true;
 		}
 	}
 
-	if (!has_nsspellchecker) {
-		addProvider(new DictionaryProviderNSSpellChecker);
+	if (!hasNsSpellChecker) {
+		addProvider(new NSSpellCheckerProvider);
 	}
 #endif
 }
 
-//-----------------------------------------------------------------------------
-
-DictionaryRef DictionaryManager::requestDictionary(const QString& language)
+Dictionary * DictionaryManager::requestDictionary(const QString &language)
 {
 	if (language.isEmpty()) {
 		// Fetch shared default dictionary
-		if (!m_default_dictionary) {
-			m_default_dictionary = *requestDictionaryData(m_default_language);
+		if (!m_defaultDictionary) {
+			m_defaultDictionary = requestDictionaryData(m_defaultLanguage);
 		}
-		return &m_default_dictionary;
+		return m_defaultDictionary;
 	} else {
 		// Fetch specific dictionary
 		return requestDictionaryData(language);
 	}
 }
 
-//-----------------------------------------------------------------------------
-
-void DictionaryManager::setDefaultLanguage(const QString& language)
+void DictionaryManager::setDefaultLanguage(const QString &language)
 {
-	if (language == m_default_language) {
+	if (language == m_defaultLanguage) {
 		return;
 	}
 
-	m_default_language = language;
-	m_default_dictionary = *requestDictionaryData(m_default_language);
+	m_defaultLanguage = language;
+	m_defaultDictionary = requestDictionaryData(m_defaultLanguage);
 
 	// Re-check documents
 	emit changed();
 }
 
-//-----------------------------------------------------------------------------
-
 void DictionaryManager::setIgnoreNumbers(bool ignore)
 {
-	foreach (AbstractDictionaryProvider* provider, m_providers) {
+	for (DictionaryProvider *provider : m_providers) {
 		provider->setIgnoreNumbers(ignore);
 	}
 
@@ -222,19 +201,15 @@ void DictionaryManager::setIgnoreNumbers(bool ignore)
 	emit changed();
 }
 
-//-----------------------------------------------------------------------------
-
 void DictionaryManager::setIgnoreUppercase(bool ignore)
 {
-	foreach (AbstractDictionaryProvider* provider, m_providers) {
+	for (DictionaryProvider *provider : m_providers) {
 		provider->setIgnoreUppercase(ignore);
 	}
 
 	// Re-check documents
 	emit changed();
 }
-
-//-----------------------------------------------------------------------------
 
 QString DictionaryManager::installedPath()
 {
@@ -245,26 +220,23 @@ QString DictionaryManager::installedPath()
 #endif
 }
 
-//-----------------------------------------------------------------------------
-
 void DictionaryManager::setPath(const QString& path)
 {
 	m_path = path;
 }
 
-//-----------------------------------------------------------------------------
-
-void DictionaryManager::setPersonal(const QStringList& words)
+void DictionaryManager::setPersonal(const QStringList &words)
 {
 	// Check if new
     QStringList personal = words;
 	std::sort(personal.begin(), personal.end(), compareWords);
+
 	if (personal == m_personal) {
 		return;
 	}
 
 	// Remove current personal dictionary
-	foreach (AbstractDictionary* dictionary, m_dictionaries) {
+	foreach (Dictionary* dictionary, m_dictionaries) {
 		dictionary->removeFromSession(m_personal);
 	}
 
@@ -273,22 +245,24 @@ void DictionaryManager::setPersonal(const QStringList& words)
 	QFile file(m_path + "/personal");
 	if (file.open(QIODevice::WriteOnly | QIODevice::Text)) {
 		QTextStream stream(&file);
+#if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
 		stream.setCodec("UTF-8");
-		foreach (const QString& word, m_personal) {
+#else
+		stream.setEncoding(QStringConverter::Utf8);
+#endif
+		for (const QString &word : m_personal) {
 			stream << word << "\n";
 		}
 	}
 
 	// Add personal dictionary
-	foreach (AbstractDictionary* dictionary, m_dictionaries) {
+	for (Dictionary *dictionary : m_dictionaries) {
 		dictionary->addToSession(m_personal);
 	}
 
 	// Re-check documents
 	emit changed();
 }
-
-//-----------------------------------------------------------------------------
 
 DictionaryManager::DictionaryManager()
 {
@@ -298,30 +272,32 @@ DictionaryManager::DictionaryManager()
 	QFile file(m_path + "/personal");
 	if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
 		QTextStream stream(&file);
+#if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
 		stream.setCodec("UTF-8");
+#else
+		stream.setEncoding(QStringConverter::Utf8);
+#endif
 		while (!stream.atEnd()) {
 			m_personal.append(stream.readLine());
 		}
+
 		std::sort(m_personal.begin(), m_personal.end(), compareWords);
 	}
 }
 
-//-----------------------------------------------------------------------------
-
 DictionaryManager::~DictionaryManager()
 {
-	foreach (AbstractDictionary* dictionary, m_dictionaries) {
+	foreach (Dictionary* dictionary, m_dictionaries) {
 		delete dictionary;
 	}
+
 	m_dictionaries.clear();
 
 	qDeleteAll(m_providers);
 	m_providers.clear();
 }
 
-//-----------------------------------------------------------------------------
-
-void DictionaryManager::addProvider(AbstractDictionaryProvider* provider)
+void DictionaryManager::addProvider(DictionaryProvider *provider)
 {
 	if (provider->isValid()) {
 		m_providers.append(provider);
@@ -331,29 +307,28 @@ void DictionaryManager::addProvider(AbstractDictionaryProvider* provider)
 	}
 }
 
-//-----------------------------------------------------------------------------
-
-AbstractDictionary** DictionaryManager::requestDictionaryData(const QString& language)
+Dictionary* DictionaryManager::requestDictionaryData(const QString &language)
 {
 	if (!m_dictionaries.contains(language)) {
-		AbstractDictionary* dictionary = 0;
-		foreach (AbstractDictionaryProvider* provider, m_providers) {
+		Dictionary *dictionary = 0;
+		for (DictionaryProvider *provider : m_providers) {
 			dictionary = provider->requestDictionary(language);
 			if (dictionary && dictionary->isValid()) {
 				break;
 			} else {
 				delete dictionary;
-				dictionary = 0;
+				dictionary = nullptr;
 			}
 		}
 
 		if (!dictionary) {
 			return DictionaryFallback::instance();
 		}
+
 		dictionary->addToSession(m_personal);
 		m_dictionaries[language] = dictionary;
 	}
-	return &m_dictionaries[language];
-}
 
-//-----------------------------------------------------------------------------
+	return m_dictionaries[language];
+}
+} // namespace ghostwriter
