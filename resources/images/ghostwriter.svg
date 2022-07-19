@@ -2,23 +2,23 @@
 <!-- Created with Inkscape (http://www.inkscape.org/) -->
 
 <svg
-   xmlns:dc="http://purl.org/dc/elements/1.1/"
-   xmlns:cc="http://creativecommons.org/ns#"
-   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
-   xmlns:svg="http://www.w3.org/2000/svg"
-   xmlns="http://www.w3.org/2000/svg"
-   xmlns:xlink="http://www.w3.org/1999/xlink"
-   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
-   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
    width="256"
    height="256"
    id="svg2"
    version="1.1"
-   inkscape:version="0.91 r"
+   inkscape:version="1.1.2 (b8e25be833, 2022-02-05)"
    sodipodi:docname="ghostwriter.svg"
    inkscape:export-filename="/home/mustangsally/ghostwriter/resources/icons/hicolor/16x16/apps/ghostwriter.png"
    inkscape:export-xdpi="5.625"
-   inkscape:export-ydpi="5.625">
+   inkscape:export-ydpi="5.625"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:xlink="http://www.w3.org/1999/xlink"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:dc="http://purl.org/dc/elements/1.1/">
   <defs
      id="defs4">
     <linearGradient
@@ -85,14 +85,37 @@
     <radialGradient
        inkscape:collect="always"
        xlink:href="#linearGradient4011"
-       id="radialGradient3773"
+       id="radialGradient3773-5"
        cx="269.09769"
        cy="881.40076"
        fx="269.09769"
        fy="881.40076"
        r="124.71495"
        gradientUnits="userSpaceOnUse"
-       gradientTransform="matrix(-0.01291963,1.6726679,-1.5684188,-0.01211456,1466.5243,424.28141)" />
+       gradientTransform="matrix(-0.01291963,1.6726679,-1.5684188,-0.01211456,1466.5243,424.28064)" />
+    <clipPath
+       clipPathUnits="userSpaceOnUse"
+       id="clipPath6163">
+      <rect
+         style="opacity:1;fill:url(#radialGradient6167);fill-opacity:1;stroke:none"
+         id="rect6165"
+         width="255.6846"
+         height="255.6846"
+         x="0.44840166"
+         y="796.38916"
+         ry="35.441429" />
+    </clipPath>
+    <radialGradient
+       inkscape:collect="always"
+       xlink:href="#linearGradient4011"
+       id="radialGradient6167"
+       gradientUnits="userSpaceOnUse"
+       gradientTransform="matrix(-0.01291963,1.6726679,-1.5684188,-0.01211456,1466.5243,424.28141)"
+       cx="269.09769"
+       cy="881.40076"
+       fx="269.09769"
+       fy="881.40076"
+       r="124.71495" />
   </defs>
   <sodipodi:namedview
      id="base"
@@ -102,8 +125,8 @@
      inkscape:pageopacity="0.0"
      inkscape:pageshadow="2"
      inkscape:zoom="0.70710678"
-     inkscape:cx="794.56912"
-     inkscape:cy="320.24584"
+     inkscape:cx="-710.64232"
+     inkscape:cy="-50.204582"
      inkscape:document-units="px"
      inkscape:current-layer="layer1"
      showgrid="false"
@@ -112,11 +135,12 @@
      inkscape:guide-bbox="true"
      showborder="false"
      inkscape:showpageshadow="false"
-     inkscape:window-width="1920"
-     inkscape:window-height="1025"
-     inkscape:window-x="0"
-     inkscape:window-y="0"
-     inkscape:window-maximized="1" />
+     inkscape:window-width="3440"
+     inkscape:window-height="1420"
+     inkscape:window-x="-4"
+     inkscape:window-y="-4"
+     inkscape:window-maximized="1"
+     inkscape:pagecheckerboard="1" />
   <metadata
      id="metadata7">
     <rdf:RDF>
@@ -125,7 +149,6 @@
         <dc:format>image/svg+xml</dc:format>
         <dc:type
            rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
-        <dc:title></dc:title>
       </cc:Work>
     </rdf:RDF>
   </metadata>
@@ -135,13 +158,13 @@
      id="layer1"
      transform="translate(0,-796.36218)">
     <rect
-       style="fill:#dc3232;fill-opacity:1;stroke:#dc3232;stroke-width:1.50994706;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+       style="fill:#3284dc;fill-opacity:1;stroke:#ffffff;stroke-width:4.43036;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
        id="rect2985"
-       width="254.17442"
-       height="254.17442"
-       x="0.96005583"
-       y="797.14386"
-       ry="35.232101" />
+       width="256.17148"
+       height="255.68541"
+       x="-0.038464095"
+       y="796.38837"
+       ry="35.441544" />
     <ellipse
        style="fill:#ffffff;fill-opacity:1;fill-rule:evenodd;stroke:none"
        id="path3757"
@@ -170,7 +193,7 @@
        inkscape:connector-curvature="0"
        sodipodi:nodetypes="cccc" />
     <ellipse
-       style="fill:#000000;fill-opacity:1;fill-rule:evenodd;stroke:none"
+       style="fill:#565656;fill-opacity:1;fill-rule:evenodd;stroke:none"
        id="path3783"
        transform="matrix(0.98480775,0.17364817,-0.17364817,0.98480775,0,0)"
        cx="246.74347"
@@ -178,20 +201,28 @@
        rx="26.60383"
        ry="35.411854" />
     <ellipse
-       style="fill:#000000;fill-opacity:1;fill-rule:evenodd;stroke:none"
+       style="fill:#575757;fill-opacity:1;fill-rule:evenodd;stroke:none"
        id="path3783-5"
        transform="matrix(0.98480775,-0.17364817,0.17364817,0.98480775,0,0)"
        cx="5.4603462"
        cy="905.13672"
        rx="26.485374"
        ry="35.411854" />
+    <ellipse
+       style="opacity:1;fill:#ffffff;fill-opacity:0.364486;stroke:#ffffff;stroke-width:0;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+       id="path5044"
+       cx="127.63277"
+       cy="864.06763"
+       rx="184.20131"
+       ry="87.858017"
+       clip-path="url(#clipPath6163)" />
     <rect
-       style="fill:url(#radialGradient3773);fill-opacity:1;stroke:none"
-       id="rect2985-2"
+       style="fill:url(#radialGradient3773-5);fill-opacity:1;stroke:none"
+       id="rect2985-2-5"
        width="255.6846"
        height="255.6846"
-       x="0.44840166"
-       y="796.38916"
+       x="0.44841003"
+       y="796.38837"
        ry="35.441429" />
   </g>
 </svg>
