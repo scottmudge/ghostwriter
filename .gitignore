@@ -42,3 +42,11 @@ build/
 
 # Mac finder stub
 .DS_Store
+
+.vscode/
+
+ghostwriter_plugin_import.cpp
+
+build.bat
+
+build_dbg.bat
