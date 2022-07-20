@@ -1,4 +1,4 @@
-/***********************************************************************
+﻿/***********************************************************************
  *
  * Copyright (C) 2014-2022 wereturtle
  * Copyright (C) 2009, 2010, 2011, 2012, 2013, 2014 Graeme Gott <graeme@gottcode.org>
@@ -1943,36 +1943,40 @@ bool MarkdownEditorPrivate::handleWhitespaceInEmptyMatch(const QChar whitespace)
 
 void MarkdownEditorPrivate::insertFormattingMarkup(const QString &markup)
 {
-    Q_Q(MarkdownEditor);
-
     // Get document text for testing toggles and so on
     const int mkp_len = markup.length();
+    // Safety
+    if (mkp_len < 1) return;
+
+    Q_Q(MarkdownEditor);   
     QTextCursor cursor = q->textCursor();
 
+    // Accessory Lambdas
+    // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     // Lambda to get preceding and succeeding characters around cursor/selection
-    const auto& getPrecedingAndSucceedingChars = [&](const int start, const int end, 
-                                        QString& preceding_out, QString& succeeding_out) {
+    static const auto& getAdjacentChars = [&](const int pos, const int length, const bool left) -> QString {
         QTextCursor c_tmp = cursor;
-        c_tmp.setPosition(start - mkp_len, QTextCursor::MoveAnchor);
-        c_tmp.setPosition(start, QTextCursor::KeepAnchor);
-        preceding_out = c_tmp.selectedText();
-        c_tmp.setPosition(end, QTextCursor::MoveAnchor);
-        c_tmp.setPosition(end + mkp_len, QTextCursor::KeepAnchor);
-        succeeding_out = c_tmp.selectedText();
+        if (left) {
+            c_tmp.setPosition(pos - length, QTextCursor::MoveAnchor);
+            c_tmp.setPosition(pos, QTextCursor::KeepAnchor);
+        } else {
+            c_tmp.setPosition(pos, QTextCursor::MoveAnchor);
+            c_tmp.setPosition(pos + length, QTextCursor::KeepAnchor);
+        }
+        return c_tmp.selectedText();
     };
 
-    if (cursor.hasSelection()) {
+    static const auto& toggleMarkupOfSelection = [&]() {
         int start = cursor.selectionStart();
         int end = cursor.selectionEnd();
 
         bool insert = true;
         QTextCursor c = cursor;
-        QTextCursor c_tmp = cursor;
         
         if (start >= mkp_len){
-            QString preceding_buf, succeeding_buf;
-            getPrecedingAndSucceedingChars(start, end, preceding_buf, succeeding_buf);
-
+            const QString& preceding_buf = getAdjacentChars(start, mkp_len, true);
+            const QString& succeeding_buf = getAdjacentChars(end, mkp_len, false);
+            
             if (preceding_buf == markup && succeeding_buf == markup){
                 insert = false;
 
@@ -2009,25 +2013,74 @@ void MarkdownEditorPrivate::insertFormattingMarkup(const QString &markup)
             }    
             q->setTextCursor(cursor);
         }
+    };
+    // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+    if (cursor.hasSelection()) {
+        toggleMarkupOfSelection();
     } else {
         bool insert = true;
 
         int cur_pos = cursor.position();
-        QString preceding_buf, succeeding_buf;
-        getPrecedingAndSucceedingChars(cur_pos, cur_pos, preceding_buf, succeeding_buf);
+        const QString& preceding_buf = getAdjacentChars(cur_pos, mkp_len, true);
+        const QString& succeeding_buf = getAdjacentChars(cur_pos, mkp_len, false);
         
-        // TODO -- Add logic to toggle on/off succeeding/preceding markup block if a space is before/after
-        // markup block.
-        //
-        // Auto-close existing markup chunk if cursor is just *before* existing markup terminator.
-        // Check number of characters left in block
+        // Returns true if selection occurred, selects text within markup block. Can search backwards.
+        static const auto& selectTextWithinMarkupBoundary = [&](const bool left) -> bool {
+            // Process: get active text block, find extents of succeeding markup substrings, translate to document positions, 
+            // and toggle like above.
+            QTextCursor c_tmp = cursor;
+            c_tmp.select(QTextCursor::BlockUnderCursor);
+            QString block_text = c_tmp.selectedText();
+            const int block_len = block_text.length();
+            int cur_pos_in_block = cursor.positionInBlock();
+            int block_pos_offset = cur_pos - cur_pos_in_block;
+
+            // QString doesn't have a reverse indexOf(), so we have to reverse the block text.
+            if (left) std::reverse(block_text.begin(), block_text.end());
+
+            int start_pos = block_text.indexOf(markup, left ? (block_len - cur_pos_in_block - 1) : cur_pos_in_block);
+            int end_pos = -1;
+            if (start_pos >= 0) end_pos = block_text.indexOf(markup, start_pos + mkp_len);
+            if (end_pos >= 0) {
+                if (left) {
+                    start_pos = (block_len - start_pos - (2 * mkp_len));
+                    end_pos = (block_len - end_pos);
+                }
+                start_pos += block_pos_offset;
+                end_pos += block_pos_offset;
+                c_tmp.setPosition((start_pos - 1) + mkp_len);
+                c_tmp.setPosition(end_pos - 1, QTextCursor::KeepAnchor);
+                cursor = c_tmp;
+                return true;
+            }
+            return false;
+        };
+        
+        // logic to toggle on/off surrounding markup block if a space/punctuation is before/after
+        // markup block. This is the same as word-processor behervior when formatting is toggled 
+        // when adjacent text is already formatted in a matching way. The text is re-selected to allow
+        // subsequent re-toggling. 
         if (succeeding_buf == markup) {
             insert = false;
-            cur_pos += mkp_len;
-            cursor.setPosition(cur_pos);
+            const QChar& left_space_buf = getAdjacentChars(cur_pos, 1, true)[0];
+            if (left_space_buf == QChar::SpecialCharacter::Space || left_space_buf.isPunct()){
+                if (selectTextWithinMarkupBoundary(false)) toggleMarkupOfSelection();
+            }
+            else{
+                cur_pos += mkp_len;
+                cursor.setPosition(cur_pos);
+            }
         }
         else if (preceding_buf == markup) {
+            const QChar& right_space_buf = getAdjacentChars(cur_pos, 1, false)[0];
             insert = false;
+            if (right_space_buf == QChar::SpecialCharacter::Space || right_space_buf.isPunct()){
+                if (selectTextWithinMarkupBoundary(true)) toggleMarkupOfSelection();
+            }
+            else{
+                // Do nothing but stop insertion                
+            }
         }
         
         // Insert markup twice (for opening and closing around the cursor),
