@@ -2055,7 +2055,7 @@ void MarkdownEditorPrivate::insertFormattingMarkup(const QString &markup)
                 c_tmp.setPosition((start_pos) + mkp_len);
                 c_tmp.setPosition(end_pos, QTextCursor::KeepAnchor);
                 cursor = c_tmp;
-                return false;
+                return true;
             }
             return false;
         };
