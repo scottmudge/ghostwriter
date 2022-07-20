@@ -1,4 +1,4 @@
-﻿/***********************************************************************
+/***********************************************************************
  *
  * Copyright (C) 2014-2022 wereturtle
  * Copyright (C) 2009, 2010, 2011, 2012, 2013, 2014 Graeme Gott <graeme@gottcode.org>
@@ -1946,13 +1946,20 @@ void MarkdownEditorPrivate::insertFormattingMarkup(const QString &markup)
     Q_Q(MarkdownEditor);
 
     // Get document text for testing toggles and so on
-    QTextCursor tmp_cursor = q->textCursor();
-    tmp_cursor.select(QTextCursor::SelectionType::Document);
-    const QString& doc = tmp_cursor.selectedText();
-    const int doc_len = doc.length();
     const int mkp_len = markup.length();
-
     QTextCursor cursor = q->textCursor();
+
+    // Lambda to get preceding and succeeding characters around cursor/selection
+    const auto& getPrecedingAndSucceedingChars = [&](const int start, const int end, 
+                                        QString& preceding_out, QString& succeeding_out) {
+        QTextCursor c_tmp = cursor;
+        c_tmp.setPosition(start - mkp_len, QTextCursor::MoveAnchor);
+        c_tmp.setPosition(start, QTextCursor::KeepAnchor);
+        preceding_out = c_tmp.selectedText();
+        c_tmp.setPosition(end, QTextCursor::MoveAnchor);
+        c_tmp.setPosition(end + mkp_len, QTextCursor::KeepAnchor);
+        succeeding_out = c_tmp.selectedText();
+    };
 
     if (cursor.hasSelection()) {
         int start = cursor.selectionStart();
@@ -1960,15 +1967,13 @@ void MarkdownEditorPrivate::insertFormattingMarkup(const QString &markup)
 
         bool insert = true;
         QTextCursor c = cursor;
+        QTextCursor c_tmp = cursor;
         
-        if ((doc_len - end) >= mkp_len && (start >= mkp_len)){
-            QString start_buf, end_buf;
-            for (int i = 0; i < mkp_len; i++){
-                end_buf.append(doc[end + i]);
-                start_buf.prepend(doc[start - (i + 1)]);
-            }
-            //QMessageBox::information((QWidget*)q, "Test", start_buf + " " + end_buf);
-            if (start_buf == markup && end_buf == markup){
+        if (start >= mkp_len){
+            QString preceding_buf, succeeding_buf;
+            getPrecedingAndSucceedingChars(start, end, preceding_buf, succeeding_buf);
+
+            if (preceding_buf == markup && succeeding_buf == markup){
                 insert = false;
 
                 // Remove existing markup.
@@ -2008,38 +2013,22 @@ void MarkdownEditorPrivate::insertFormattingMarkup(const QString &markup)
         bool insert = true;
 
         int cur_pos = cursor.position();
-
-        // Only need to check if the document is long enough to at least have pre-existing markup
-        if ((doc_len - mkp_len) > 0) {
-            QChar next_char = (cur_pos < (doc_len-1)) ? doc[cur_pos+1] : QChar::SpecialCharacter::Null;
-            bool next_char_is_mkp = (next_char == markup[0]);
-
-            // Auto-close existing markup chunk if cursor is just *before* existing markup terminator.
-            // Check number of characters left in block
-            if (next_char_is_mkp){
-                if ((doc_len - cur_pos) >= mkp_len) {
-                    QString buf;
-                    for (int i = 0; i < mkp_len; i++) buf.append(doc[(cur_pos) + i]);
-                    if (buf == markup) {
-                        insert = false;
-                        cur_pos += mkp_len;
-                    }
-                }
-            }
-            // Otherwise we are potentiall *after* a markup character, let's check
-            else if (cur_pos >= mkp_len) {
-                QString buf;
-                for (int i = 0; i < mkp_len; i++) buf.prepend(doc[cur_pos - (i + 1)]);
-                if (buf == markup) {
-                    if (next_char == QChar::SpecialCharacter::Space){
-                        // TODO -- Toggle off markup.
-                    } 
-                    else insert = false;
-                }
-            }
+        QString preceding_buf, succeeding_buf;
+        getPrecedingAndSucceedingChars(cur_pos, cur_pos, preceding_buf, succeeding_buf);
+        
+        // TODO -- Add logic to toggle on/off succeeding/preceding markup block if a space is before/after
+        // markup block.
+        //
+        // Auto-close existing markup chunk if cursor is just *before* existing markup terminator.
+        // Check number of characters left in block
+        if (succeeding_buf == markup) {
+            insert = false;
+            cur_pos += mkp_len;
+            cursor.setPosition(cur_pos);
         }
-
-        cursor.setPosition(cur_pos);
+        else if (preceding_buf == markup) {
+            insert = false;
+        }
         
         // Insert markup twice (for opening and closing around the cursor),
         // and then move the cursor to be between the pair.
