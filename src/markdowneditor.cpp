@@ -1,4 +1,4 @@
-/***********************************************************************
+﻿/***********************************************************************
  *
  * Copyright (C) 2014-2022 wereturtle
  * Copyright (C) 2009, 2010, 2011, 2012, 2013, 2014 Graeme Gott <graeme@gottcode.org>
@@ -1988,7 +1988,20 @@ void MarkdownEditorPrivate::insertFormattingMarkup(const QString &markup)
             c.setPosition(end + mkp_len);
             c.insertText(markup);
             c.endEditBlock();
-            cursor.movePosition(QTextCursor::PreviousCharacter, QTextCursor::QTextCursor::KeepAnchor, markup.length());
+
+            // Use setPosition() rather than movePosition() because selections made from right-to-left end up
+            // with the anchor being *after* the first/start insertion, causing the anchor to be outside the pre-insert
+            // selection.
+            //
+            // Using setPosition() allows us to specifically set the exact selection boundaries.
+            if (cursor.anchor() < end){
+                cursor.setPosition(start + mkp_len, QTextCursor::MoveAnchor);
+                cursor.setPosition(end + mkp_len, QTextCursor::KeepAnchor);
+            }
+            else{
+                cursor.setPosition(end + mkp_len, QTextCursor::MoveAnchor);
+                cursor.setPosition(start + mkp_len, QTextCursor::KeepAnchor);
+            }    
             q->setTextCursor(cursor);
         }
     } else {
