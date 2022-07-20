@@ -2036,15 +2036,8 @@ void MarkdownEditorPrivate::insertFormattingMarkup(const QString &markup)
             int cur_pos_in_block = cursor.positionInBlock();
             int block_pos_offset = cur_pos - cur_pos_in_block;
 
-            // Check if first line, weird bug where first line in document needs extra block position offset.
-            {
-                QTextCursor c_tmp2 = cursor;
-                c_tmp2.movePosition(QTextCursor::StartOfLine);
-                int tmp_pos = c_tmp2.position();
-                c_tmp2.movePosition(QTextCursor::Up);
-                bool is_first_line = (c_tmp2.position() == tmp_pos);
-                if (!is_first_line) block_pos_offset--;
-            }
+            // First block has invisible character or something increasing size erroneously.
+            if (cursor.block().firstLineNumber() > 0) block_pos_offset--;
 
             // QString doesn't have a reverse indexOf(), so we have to reverse the block text.
             if (left) std::reverse(block_text.begin(), block_text.end());
