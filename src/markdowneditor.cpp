@@ -2036,6 +2036,16 @@ void MarkdownEditorPrivate::insertFormattingMarkup(const QString &markup)
             int cur_pos_in_block = cursor.positionInBlock();
             int block_pos_offset = cur_pos - cur_pos_in_block;
 
+            // Check if first line, weird bug where first line in document needs extra block position offset.
+            {
+                QTextCursor c_tmp2 = cursor;
+                c_tmp2.movePosition(QTextCursor::StartOfLine);
+                int tmp_pos = c_tmp2.position();
+                c_tmp2.movePosition(QTextCursor::Up);
+                bool is_first_line = (c_tmp2.position() == tmp_pos);
+                if (!is_first_line) block_pos_offset--;
+            }
+
             // QString doesn't have a reverse indexOf(), so we have to reverse the block text.
             if (left) std::reverse(block_text.begin(), block_text.end());
 
@@ -2049,10 +2059,10 @@ void MarkdownEditorPrivate::insertFormattingMarkup(const QString &markup)
                 }
                 start_pos += block_pos_offset;
                 end_pos += block_pos_offset;
-                c_tmp.setPosition((start_pos - 1) + mkp_len);
-                c_tmp.setPosition(end_pos - 1, QTextCursor::KeepAnchor);
+                c_tmp.setPosition((start_pos) + mkp_len);
+                c_tmp.setPosition(end_pos, QTextCursor::KeepAnchor);
                 cursor = c_tmp;
-                return true;
+                return false;
             }
             return false;
         };
@@ -2063,8 +2073,10 @@ void MarkdownEditorPrivate::insertFormattingMarkup(const QString &markup)
         // subsequent re-toggling. 
         if (succeeding_buf == markup) {
             insert = false;
-            const QChar& left_space_buf = getAdjacentChars(cur_pos, 1, true)[0];
-            if (left_space_buf == QChar::SpecialCharacter::Space || left_space_buf.isPunct()){
+            const QString& left_space_buf = getAdjacentChars(cur_pos, 1, true);
+            const QChar left_char = left_space_buf.length() > 0 ? left_space_buf[0] : QChar::SpecialCharacter::Null;
+            // If char is null, it means we're at beginning of document
+            if (left_char == QChar::SpecialCharacter::Space || left_char.isPunct() || left_char.isNull()){
                 if (selectTextWithinMarkupBoundary(false)) toggleMarkupOfSelection();
             }
             else{
@@ -2073,9 +2085,11 @@ void MarkdownEditorPrivate::insertFormattingMarkup(const QString &markup)
             }
         }
         else if (preceding_buf == markup) {
-            const QChar& right_space_buf = getAdjacentChars(cur_pos, 1, false)[0];
+            const QString& right_space_buf = getAdjacentChars(cur_pos, 1, false);
+            const QChar right_char = right_space_buf.length() > 0 ? right_space_buf[0] : QChar::SpecialCharacter::Null;
             insert = false;
-            if (right_space_buf == QChar::SpecialCharacter::Space || right_space_buf.isPunct()){
+            // If char is null, it means we're at end of document
+            if (right_char == QChar::SpecialCharacter::Space || right_char.isPunct() || right_char.isNull()){
                 if (selectTextWithinMarkupBoundary(true)) toggleMarkupOfSelection();
             }
             else{
