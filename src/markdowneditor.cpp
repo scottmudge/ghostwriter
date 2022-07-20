@@ -2069,7 +2069,7 @@ void MarkdownEditorPrivate::insertFormattingMarkup(const QString &markup)
             const QString& left_space_buf = getAdjacentChars(cur_pos, 1, true);
             const QChar left_char = left_space_buf.length() > 0 ? left_space_buf[0] : QChar::SpecialCharacter::Null;
             // If char is null, it means we're at beginning of document
-            if (left_char == QChar::SpecialCharacter::Space || left_char.isPunct() || left_char.isNull()){
+            if (left_char == QChar::SpecialCharacter::Space || left_char.isNull()){
                 if (selectTextWithinMarkupBoundary(false)) toggleMarkupOfSelection();
             }
             else{
@@ -2082,7 +2082,7 @@ void MarkdownEditorPrivate::insertFormattingMarkup(const QString &markup)
             const QChar right_char = right_space_buf.length() > 0 ? right_space_buf[0] : QChar::SpecialCharacter::Null;
             insert = false;
             // If char is null, it means we're at end of document
-            if (right_char == QChar::SpecialCharacter::Space || right_char.isPunct() || right_char.isNull()){
+            if (right_char == QChar::SpecialCharacter::Space || right_char.isNull()){
                 if (selectTextWithinMarkupBoundary(true)) toggleMarkupOfSelection();
             }
             else{
