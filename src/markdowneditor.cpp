@@ -2199,19 +2199,30 @@ void MarkdownEditorPrivate::insertFormattingMarkup(const MarkupType markupType)
         };
 
         if (preceding_existing_markup != MarkupType_None){
-            if (selectTextWithinMarkupBoundary(true, preceding_existing_markup)){
+            if (selectTextWithinMarkupBoundary(true, preceding_existing_markup)) {
                 toggleMarkupOfSelection();
+                return;
             }
-            return;
+            else{
+                // Try to toggle the other direction, if it exists.
+                cursor.setPosition(cursor.position() - Markup_Strings[preceding_existing_markup].length());
+                if (selectTextWithinMarkupBoundary(false, preceding_existing_markup)){
+                    toggleMarkupOfSelection();
+                    return;
+                }
+                else
+                    cursor.setPosition(cursor.position() + Markup_Strings[preceding_existing_markup].length());
+            }
         }
         if (succeeding_existing_markup != MarkupType_None){
             if (selectTextWithinMarkupBoundary(false, succeeding_existing_markup)){
                 toggleMarkupOfSelection();
-                return;
             }
-            // Move cursor beyond terminating markup string to "close" markup block.
-            cursor.setPosition(cursor.position() + Markup_Strings[succeeding_existing_markup].length());
-            q->setTextCursor(cursor);
+            else{
+                // Move cursor beyond terminating markup string to "close" markup block.
+                cursor.setPosition(cursor.position() + Markup_Strings[succeeding_existing_markup].length());
+                q->setTextCursor(cursor);
+            }
             return;
         }
 
