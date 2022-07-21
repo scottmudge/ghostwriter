@@ -57,6 +57,81 @@
 
 #define GW_TEXT_FADE_FACTOR 1.5
 
+enum MarkupType {
+    MarkupType_None = -1,
+    MarkupType_Bold, 
+    MarkupType_Italic,
+    MarkupType_StrikeThrough,
+    MarkupType_BoldItallic, // Special case used for checking if bold + itallic are both on
+    MarkupType_Count
+};
+
+static const QString Markup_Strings[MarkupType_Count] = {
+    QStringLiteral("**"),
+    QStringLiteral("*"),
+    QStringLiteral("~~"),
+    QStringLiteral("***")
+};
+
+// Maxmimum length of any markup string, used for initializing scan buffer.
+static constexpr int Markup_MaxLen = 3;
+
+// Used for stripping out non-markup characters from scan buffers.
+static const QChar Markup_Chars[] = {
+    QChar('*'), 
+    QChar('~')
+};
+
+// Used to strip out non-markup characters from scan buffers.
+static const bool isQCharMarkup(const QChar& ch){
+    for (int i = 0; i < sizeof(Markup_Chars) / sizeof(Markup_Chars[0]); i++) {
+        if (ch == Markup_Chars[i]) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// Similar to Qt's indexOf, but can go reverse.
+static int getIndexOfMarkup(const QString& markup, const QString& block_str, int start_pos = -1, const bool reverse = false) {
+    const int block_len = block_str.length();
+    const int markup_len = markup.length();
+    if (reverse){
+        if (start_pos < 0) start_pos = (block_len - 1);
+        for (int i = (start_pos-1); i >= 0; i--){
+            bool match = false;
+            for (int j = 0; j < markup_len; j++) {
+                if (block_str[i - j] != markup[markup_len - j - 1]) {
+                    match = false;
+                    break;
+                }
+                match = true;
+            }
+            if (match) {
+                return i;
+            }
+        }
+    }
+    else{
+        if (start_pos < 0) start_pos = 0;
+        for (int i = start_pos; i < block_len; i++){
+            bool match = false;
+            for (int j = 0; j < markup_len; j++) {
+                if (block_str[i + j] != markup[j]) {
+                    match = false;
+                    break;
+                }
+                match = true;
+            }
+            if (match) {
+                return i;
+            }
+        }
+    }
+
+    return -1;
+};
+
 namespace ghostwriter
 {
 class MarkdownEditorPrivate
@@ -145,7 +220,7 @@ public:
     bool insertPairedCharacters(const QChar firstChar);
     bool handleEndPairCharacterTyped(const QChar ch);
     bool handleWhitespaceInEmptyMatch(const QChar whitespace);
-    void insertFormattingMarkup(const QString &markup);
+    void insertFormattingMarkup(const MarkupType markupType);
     QString priorIndentation();
     QString priorMarkdownBlockItemStart
     (
@@ -836,21 +911,21 @@ void MarkdownEditor::bold()
 {
     Q_D(MarkdownEditor);
     
-    d->insertFormattingMarkup("**");
+    d->insertFormattingMarkup(MarkupType_Bold);
 }
 
 void MarkdownEditor::italic()
 {
     Q_D(MarkdownEditor);
     
-    d->insertFormattingMarkup("*");
+    d->insertFormattingMarkup(MarkupType_Italic);
 }
 
 void MarkdownEditor::strikethrough()
 {
     Q_D(MarkdownEditor);
     
-    d->insertFormattingMarkup("~~");
+    d->insertFormattingMarkup(MarkupType_StrikeThrough);
 }
 
 void MarkdownEditor::insertComment()
@@ -1941,10 +2016,12 @@ bool MarkdownEditorPrivate::handleWhitespaceInEmptyMatch(const QChar whitespace)
     return false;
 }
 
-void MarkdownEditorPrivate::insertFormattingMarkup(const QString &markup)
+void MarkdownEditorPrivate::insertFormattingMarkup(const MarkupType markupType)
 {
+    const QString& markup = Markup_Strings[markupType];
     // Get document text for testing toggles and so on
     const int mkp_len = markup.length();
+
     // Safety
     if (mkp_len < 1) return;
 
@@ -1966,28 +2043,54 @@ void MarkdownEditorPrivate::insertFormattingMarkup(const QString &markup)
         return c_tmp.selectedText();
     };
 
-    static const auto& toggleMarkupOfSelection = [&]() {
+    // Lambda for toggling on/off the markup surrounding a selected/highlighted bit of text.
+    const auto& toggleMarkupOfSelection = [&]() {
         int start = cursor.selectionStart();
         int end = cursor.selectionEnd();
 
         bool insert = true;
         QTextCursor c = cursor;
         
-        if (start >= mkp_len){
-            const QString& preceding_buf = getAdjacentChars(start, mkp_len, true);
-            const QString& succeeding_buf = getAdjacentChars(end, mkp_len, false);
-            
-            if (preceding_buf == markup && succeeding_buf == markup){
-                insert = false;
+        // Get strings of max markup length to scan for other markup types.
+        QString preceding_buf = getAdjacentChars(start, Markup_MaxLen, true);
+        QString succeeding_buf = getAdjacentChars(end, Markup_MaxLen, false);
 
-                // Remove existing markup.
-                c.beginEditBlock();
-                c.setPosition(start - mkp_len);
-                for (int i = 0; i < mkp_len; i++) c.deleteChar();
-                c.setPosition(end - mkp_len);
-                for (int i = 0; i < mkp_len; i++) c.deleteChar();
-                c.endEditBlock();
+        // Strip out non-markup characters from the strings.
+        QString preceding_str;
+        QString succeeding_str;
+        for (int i = preceding_buf.length() - 1; i >= 0; i--){
+            if (isQCharMarkup(preceding_buf[i])) preceding_str.append(preceding_buf[i]);
+            else break;
+        }
+        for (int i = 0; i < succeeding_buf.length(); i++){
+            if (isQCharMarkup(succeeding_buf[i])) succeeding_str.append(succeeding_buf[i]);
+            else break;
+        }
+
+        // If inserting markup type, check for others before toggling
+        MarkupType existing_markup = MarkupType_None;
+        for (int i = 0; i < MarkupType_Count; i++){
+            const QString& markup_test = Markup_Strings[i];
+            if (preceding_str == markup_test && succeeding_str == markup_test) {
+                existing_markup = static_cast<MarkupType>(i);
+                break;
             }
+        }
+        
+        // Test for special cases when there are three asterisks (bold+italic) to prevent adding unneeded extra
+        // markup.
+        if (existing_markup == markupType ||
+             (existing_markup == MarkupType_BoldItallic && markupType == MarkupType_Bold) ||
+             (existing_markup == MarkupType_BoldItallic && markupType == MarkupType_Italic)) {
+            insert = false;
+
+            // Remove existing markup.
+            c.beginEditBlock();
+            c.setPosition(start - mkp_len);
+            for (int i = 0; i < mkp_len; i++) c.deleteChar();
+            c.setPosition(end - mkp_len);
+            for (int i = 0; i < mkp_len; i++) c.deleteChar();
+            c.endEditBlock();
         }
 
         if (insert){
@@ -2018,88 +2121,108 @@ void MarkdownEditorPrivate::insertFormattingMarkup(const QString &markup)
 
     if (cursor.hasSelection()) {
         toggleMarkupOfSelection();
-    } else {
-        bool insert = true;
+    } 
+    // If no selection active, check if there are surrounding markup strings. If so, select the text within and toggle.
+    else {
+        QString preceding_buf = getAdjacentChars(cursor.position(), Markup_MaxLen, true);
+        QString succeeding_buf = getAdjacentChars(cursor.position(), Markup_MaxLen, false);
 
-        int cur_pos = cursor.position();
-        const QString& preceding_buf = getAdjacentChars(cur_pos, mkp_len, true);
-        const QString& succeeding_buf = getAdjacentChars(cur_pos, mkp_len, false);
-        
-        // Returns true if selection occurred, selects text within markup block. Can search backwards.
-        static const auto& selectTextWithinMarkupBoundary = [&](const bool left) -> bool {
-            // Process: get active text block, find extents of succeeding markup substrings, translate to document positions, 
-            // and toggle like above.
+        // Extract markup until a non-markup character is encountered.
+        QString preceding_str;
+        QString succeeding_str;
+        for (int i = preceding_buf.length() - 1; i >= 0; i--){
+            if (isQCharMarkup(preceding_buf[i])) preceding_str.append(preceding_buf[i]);
+            else break;
+        }
+        for (int i = 0; i < succeeding_buf.length(); i++){
+            if (isQCharMarkup(succeeding_buf[i])) succeeding_str.append(succeeding_buf[i]);
+            else break;
+        }
+
+        MarkupType preceding_existing_markup = MarkupType_None;
+        MarkupType succeeding_existing_markup = MarkupType_None;
+        for (int i = 0; i < MarkupType_Count; i++){
+            const QString& markup_test = Markup_Strings[i];
+            if (preceding_str == markup_test) preceding_existing_markup = static_cast<MarkupType>(i);
+            if (succeeding_str == markup_test) succeeding_existing_markup = static_cast<MarkupType>(i);
+        }
+
+        // If both preceding and succeeding strings are the same markup and no text is selected, we're inside the middle, so just toggle.
+        // E.g., **<cursor>**
+        if (preceding_existing_markup != MarkupType_None && preceding_existing_markup == succeeding_existing_markup) {
+            toggleMarkupOfSelection();
+            return;
+        }
+
+        // Returns true if selection occurred, selects text within markup block. Can search reverse.
+        const auto& selectTextWithinMarkupBoundary = [&](const bool reverse_search, const MarkupType found_markup_type) -> bool {
+            const QString& existing_markup = Markup_Strings[found_markup_type];
+
             QTextCursor c_tmp = cursor;
             c_tmp.select(QTextCursor::BlockUnderCursor);
-            QString block_text = c_tmp.selectedText();
-            const int block_len = block_text.length();
+            const QString& block_str = c_tmp.selectedText();
+            int cur_pos = cursor.position();
             int cur_pos_in_block = cursor.positionInBlock();
-            int block_pos_offset = cur_pos - cur_pos_in_block;
+            bool result = false;
 
             // First block has invisible character or something increasing size erroneously.
-            if (cursor.block().firstLineNumber() > 0) block_pos_offset--;
+            if (cursor.block().firstLineNumber() <= 0) cur_pos_in_block--;
 
-            // QString doesn't have a reverse indexOf(), so we have to reverse the block text.
-            if (left) std::reverse(block_text.begin(), block_text.end());
+            if (reverse_search){
+                cur_pos -= existing_markup.length();
+                cur_pos_in_block -= (existing_markup.length());
 
-            int start_pos = block_text.indexOf(markup, left ? (block_len - cur_pos_in_block - 1) : cur_pos_in_block);
-            int end_pos = -1;
-            if (start_pos >= 0) end_pos = block_text.indexOf(markup, start_pos + mkp_len);
-            if (end_pos >= 0) {
-                if (left) {
-                    start_pos = (block_len - start_pos - (2 * mkp_len));
-                    end_pos = (block_len - end_pos);
-                }
-                start_pos += block_pos_offset;
-                end_pos += block_pos_offset;
-                c_tmp.setPosition((start_pos) + mkp_len);
-                c_tmp.setPosition(end_pos, QTextCursor::KeepAnchor);
-                cursor = c_tmp;
-                return true;
-            }
-            return false;
-        };
-        
-        // logic to toggle on/off surrounding markup block if a space/punctuation is before/after
-        // markup block. This is the same as word-processor behervior when formatting is toggled 
-        // when adjacent text is already formatted in a matching way. The text is re-selected to allow
-        // subsequent re-toggling. 
-        if (succeeding_buf == markup) {
-            insert = false;
-            const QString& left_space_buf = getAdjacentChars(cur_pos, 1, true);
-            const QChar left_char = left_space_buf.length() > 0 ? left_space_buf[0] : QChar::SpecialCharacter::Null;
-            // If char is null, it means we're at beginning of document
-            if (left_char == QChar::SpecialCharacter::Space || left_char.isNull()){
-                if (selectTextWithinMarkupBoundary(false)) toggleMarkupOfSelection();
-            }
-            else{
-                cur_pos += mkp_len;
+                const int end_pos = getIndexOfMarkup(existing_markup, block_str, cur_pos_in_block, true);
+                if (end_pos < 0) return false;
+
                 cursor.setPosition(cur_pos);
-            }
-        }
-        else if (preceding_buf == markup) {
-            const QString& right_space_buf = getAdjacentChars(cur_pos, 1, false);
-            const QChar right_char = right_space_buf.length() > 0 ? right_space_buf[0] : QChar::SpecialCharacter::Null;
-            insert = false;
-            // If char is null, it means we're at end of document
-            if (right_char == QChar::SpecialCharacter::Space || right_char.isNull()){
-                if (selectTextWithinMarkupBoundary(true)) toggleMarkupOfSelection();
+                cursor.setPosition(cur_pos - (cur_pos_in_block - end_pos), QTextCursor::KeepAnchor);
+                result = true;
             }
             else{
-                // Do nothing but stop insertion                
+                cur_pos += existing_markup.length();
+                cur_pos_in_block += existing_markup.length() + 1;
+
+                const int end_pos = getIndexOfMarkup(existing_markup, block_str, cur_pos_in_block);
+                if (end_pos < 0) return false;
+
+                cursor.setPosition(cur_pos);
+                cursor.setPosition(cur_pos + (end_pos - cur_pos_in_block), QTextCursor::KeepAnchor);
+                result = true;
             }
+
+            if (result) q->setTextCursor(cursor);
+
+            // If desired behavior is to select text and _NOT_ toggle it (requriing a second markup keystroke), set return false.
+            // _Otherwise_, if if return true, will trigger toggling of the markup immediately.
+            return result;
+        };
+
+        if (preceding_existing_markup != MarkupType_None){
+            if (selectTextWithinMarkupBoundary(true, preceding_existing_markup)){
+                toggleMarkupOfSelection();
+            }
+            return;
         }
-        
+        if (succeeding_existing_markup != MarkupType_None){
+            if (selectTextWithinMarkupBoundary(false, succeeding_existing_markup)){
+                toggleMarkupOfSelection();
+                return;
+            }
+            // Move cursor beyond terminating markup string to "close" markup block.
+            cursor.setPosition(cursor.position() + Markup_Strings[succeeding_existing_markup].length());
+            q->setTextCursor(cursor);
+            return;
+        }
+
         // Insert markup twice (for opening and closing around the cursor),
         // and then move the cursor to be between the pair.
         //
-        if (insert) {
-            cursor.beginEditBlock();
-            cursor.insertText(markup);
-            cursor.insertText(markup);
-            cursor.movePosition(QTextCursor::PreviousCharacter, QTextCursor::MoveAnchor, markup.length());
-            cursor.endEditBlock();
-        }
+        cursor.beginEditBlock();
+        cursor.insertText(markup);
+        cursor.insertText(markup);
+        cursor.movePosition(QTextCursor::PreviousCharacter, QTextCursor::MoveAnchor, markup.length());
+        cursor.endEditBlock();
         q->setTextCursor(cursor);
     }
 }
